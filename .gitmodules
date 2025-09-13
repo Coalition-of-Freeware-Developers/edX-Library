@@ -1,0 +1,6 @@
+[submodule "Dependency/Catch2"]
+	path = Dependency/Catch2
+	url = git@github.com:catchorg/Catch2.git
+[submodule "Dependency/vcpkg"]
+	path = Dependency/vcpkg
+	url = git@github.com:microsoft/vcpkg.git
