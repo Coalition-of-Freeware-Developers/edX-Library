@@ -120,6 +120,32 @@ MESSAGE(STATUS "=================================================")
 # --------------------------------
 FIND_PACKAGE(nlohmann_json CONFIG REQUIRED)
 
+
+############################################
+# X-Plane Scenery Library (XPLIB via FetchContent)
+############################################
+IF(FETCHCONTENT_XPLIB AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.11)
+    FETCHCONTENT_DECLARE(
+        XPSceneryLib
+        GIT_REPOSITORY https://github.com/Coalition-of-Freeware-Developers/X-PlaneSceneryLibrary.git
+        GIT_TAG main
+        GIT_SHALLOW TRUE
+        GIT_PROGRESS TRUE
+        GIT_SUBMODULES ""
+    )
+    FETCHCONTENT_GETPROPERTIES(XPSceneryLib)
+    IF(NOT xpscenerylib_POPULATED)
+        FETCHCONTENT_POPULATE(XPSceneryLib)
+        IF(EXISTS "${xpscenerylib_SOURCE_DIR}/cmake/math.cmake")
+            FILE(READ "${xpscenerylib_SOURCE_DIR}/cmake/math.cmake" XPSCENERYLIB_MATH_CMAKE)
+            STRING(REPLACE "CMAKE_SOURCE_DIR" "CMAKE_CURRENT_SOURCE_DIR" XPSCENERYLIB_MATH_CMAKE "${XPSCENERYLIB_MATH_CMAKE}")
+            FILE(WRITE "${xpscenerylib_SOURCE_DIR}/cmake/math.cmake" "${XPSCENERYLIB_MATH_CMAKE}")
+        ENDIF()
+        ADD_SUBDIRECTORY("${xpscenerylib_SOURCE_DIR}" "${xpscenerylib_BINARY_DIR}")
+    ENDIF()
+ENDIF()
+
+
 # --------------------------------
 # Catch2 (for tests only)
 # --------------------------------
@@ -204,7 +230,7 @@ ENDIF()
 # Output directories (only when top-level; don’t override parent)
 # --------------------------------
 IF(PROJECT_IS_TOP_LEVEL)
-	FOREACH(TARGET IN ITEMS EdxTests Catch2 Catch2WithMain edX)
+	FOREACH(TARGET IN ITEMS EdxTests Catch2 Catch2WithMain edX XPSceneryLib)
 		IF(TARGET ${TARGET})
 			SET_TARGET_PROPERTIES(${TARGET} PROPERTIES
 			  ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
