@@ -188,11 +188,11 @@ namespace edx
         void from_json(const json& j);
 
         // File operations
-        bool save_to_file(const std::filesystem::path& filePath) const;
+        [[nodiscard]] bool save_to_file(const std::filesystem::path& filePath) const;
         bool load_from_file(const std::filesystem::path& filePath);
 
         // Validation
-        bool validate() const;
+        [[nodiscard]] bool validate() const;
         [[nodiscard]] std::vector<std::string> get_validation_errors() const;
     };
 

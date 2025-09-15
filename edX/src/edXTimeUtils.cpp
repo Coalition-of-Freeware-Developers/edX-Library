@@ -12,7 +12,7 @@
 */
 #include <iomanip>
 #include <sstream>
-#include <edX/includes/edXTimeUtils.h>
+#include <edX/include/edXTimeUtils.h>
 
 /// ----------------------------------------------------------------------------
 

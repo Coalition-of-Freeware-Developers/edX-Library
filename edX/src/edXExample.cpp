@@ -12,8 +12,9 @@
 */
 
 #include <iomanip>
+#include <memory>
 #include <iostream>
-#include <edX/includes/edXManager.h>
+#include <edX/include/edXManager.h>
 
 /// ----------------------------------------------------------------------------
 
@@ -23,7 +24,7 @@
  * Demonstrates creating, saving, and loading both project and library files
  * using the modernized JSON-based edX format.
  */
-void demonstrate_edx_usage()
+static void demonstrate_edx_usage()
 {
     std::cout << "=== Scenery Editor X - edX File Format Demo ===\n\n";
 
@@ -32,7 +33,7 @@ void demonstrate_edx_usage()
 
     // Set up error callback
     manager.set_error_callback([](const std::string& error) {
-        std::cerr << "ERROR: " << error << std::endl;
+        std::cerr << "ERROR: " << error << '\n';
     });
 
     // === CREATE AND SAVE A PROJECT ===
@@ -43,7 +44,8 @@ void demonstrate_edx_usage()
         "Demo Author"
     );
 
-    if (!project) {
+    if (!project)
+	{
         std::cerr << "Failed to create project\n";
         return;
     }
@@ -69,9 +71,9 @@ void demonstrate_edx_usage()
     project->airport.transitionLevel = "FL180";
 
     // Add optional frequencies
-    project->airport.tower = 120.5;
-    project->airport.ground = 121.8;
-    project->airport.atis = 135.1;
+    project->airport.tower = std::make_unique<double>(120.5);
+    project->airport.ground = std::make_unique<double>(121.8);
+    project->airport.atis = std::make_unique<double>(135.1);
 
     // Add library references
     edx::LibraryReference lib1;
@@ -135,27 +137,32 @@ void demonstrate_edx_usage()
     project->layers.push_back(layer2);
 
     // Validate project
-    auto errors = manager.validate_project(*project);
-    if (!errors.empty()) {
+    if (auto errors = manager.validate_project(*project); !errors.empty())
+	{
         std::cout << "Project validation errors:\n";
-        for (const auto& error : errors) {
+        for (const auto& error : errors)
             std::cout << "  - " << error << "\n";
-        }
-    } else {
+    }
+    else
+	{
         std::cout << "Project validation: PASSED\n";
     }
 
     // Save project
     std::cout << "\n2. Saving project...\n";
     bool saved = manager.save_project(*project, "SanFranciscoDemo.edX",
-        [](float progress, const std::string& status) {
+        [](float progress, const std::string& status)
+		{
             std::cout << "  Progress: " << std::fixed << std::setprecision(1)
                       << (progress * 100) << "% - " << status << "\n";
         });
 
-    if (saved) {
+    if (saved)
+	{
         std::cout << "Project saved successfully!\n";
-    } else {
+    }
+    else
+	{
         std::cout << "Failed to save project: " << manager.get_last_error() << "\n";
         return;
     }
@@ -169,7 +176,8 @@ void demonstrate_edx_usage()
         "1.0.0"
     );
 
-    if (!library) {
+    if (!library)
+	{
         std::cerr << "Failed to create library\n";
         return;
     }
@@ -218,23 +226,26 @@ void demonstrate_edx_usage()
     library->add_object(obj2);
 
     // Validate library
-    auto libErrors = manager.validate_library(*library);
-    if (!libErrors.empty()) {
+    if (auto libErrors = manager.validate_library(*library); !libErrors.empty())
+	{
         std::cout << "Library validation errors:\n";
-        for (const auto& error : libErrors) {
+        for (const auto& error : libErrors)
             std::cout << "  - " << error << "\n";
-        }
-    } else {
+    }
+    else
+	{
         std::cout << "Library validation: PASSED\n";
     }
 
     // Save library
     std::cout << "\n4. Saving library...\n";
-    bool libSaved = manager.save_library(*library, "DemoAirportObjects.lib");
 
-    if (libSaved) {
+    if (bool libSaved = manager.save_library(*library, "DemoAirportObjects.lib"))
+	{
         std::cout << "Library saved successfully!\n";
-    } else {
+    }
+    else
+	{
         std::cout << "Failed to save library: " << manager.get_last_error() << "\n";
         return;
     }
@@ -243,21 +254,23 @@ void demonstrate_edx_usage()
     std::cout << "\n5. Loading and verifying saved files...\n";
 
     // Load project
-    auto loadedProject = manager.load_project("SanFranciscoDemo.edX");
-    if (loadedProject) {
+    if (auto loadedProject = manager.load_project("SanFranciscoDemo.edX"))
+	{
         std::cout << "✓ Project loaded successfully\n";
         std::cout << "  Name: " << loadedProject->project.name << "\n";
         std::cout << "  Airport: " << loadedProject->airport.icao << " - " << loadedProject->airport.name << "\n";
         std::cout << "  Assets: " << loadedProject->assets.size() << "\n";
         std::cout << "  Layers: " << loadedProject->layers.size() << "\n";
         std::cout << "  Libraries: " << loadedProject->libraries.size() << "\n";
-    } else {
+    }
+    else
+	{
         std::cout << "✗ Failed to load project\n";
     }
 
     // Load library
-    auto loadedLibrary = manager.load_library("DemoAirportObjects.lib");
-    if (loadedLibrary) {
+    if (auto loadedLibrary = manager.load_library("DemoAirportObjects.lib"))
+	{
         std::cout << "✓ Library loaded successfully\n";
         std::cout << "  Name: " << loadedLibrary->library.name << "\n";
         std::cout << "  Version: " << loadedLibrary->library.version << "\n";
@@ -265,12 +278,15 @@ void demonstrate_edx_usage()
 
         auto categories = loadedLibrary->get_categories();
         std::cout << "  Categories: ";
-        for (size_t i = 0; i < categories.size(); ++i) {
+        for (size_t i = 0; i < categories.size(); ++i)
+		{
             std::cout << categories[i];
             if (i < categories.size() - 1) std::cout << ", ";
         }
         std::cout << "\n";
-    } else {
+    }
+    else
+	{
         std::cout << "✗ Failed to load library\n";
     }
 
@@ -283,11 +299,14 @@ void demonstrate_edx_usage()
  */
 int main()
 {
-    try {
+    try
+	{
         demonstrate_edx_usage();
         return 0;
-    } catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
+    }
+    catch (const std::exception& e)
+	{
+        std::cerr << "Exception: " << e.what() << '\n';
         return 1;
     }
 }

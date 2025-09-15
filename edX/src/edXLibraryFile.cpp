@@ -14,8 +14,8 @@
 #include <fstream>
 #include <iostream>
 #include <set>
-#include <edX/includes/edXLibraryFile.h>
-#include <edX/includes/edXTimeUtils.h>
+#include <edX/include/edXLibraryFile.h>
+#include <edX/include/edXTimeUtils.h>
 
 /// ----------------------------------------------------------------------------
 
@@ -133,13 +133,15 @@ namespace edx
     // File operations
     bool LibraryFile::save_to_file(const std::filesystem::path& filePath) const
     {
-        try {
+        try
+		{
             json j;
             to_json(j);
 
             std::ofstream file(filePath);
-            if (!file.is_open()) {
-                std::cerr << "Error: Cannot open file for writing: " << filePath << std::endl;
+            if (!file.is_open())
+			{
+                std::cerr << "Error: Cannot open file for writing: " << filePath << '\n';
                 return false;
             }
 
@@ -147,26 +149,31 @@ namespace edx
             file << j.dump(4);
             file.close();
 
-            std::cout << "Successfully saved library to: " << filePath << std::endl;
+            std::cout << "Successfully saved library to: " << filePath << '\n';
             return true;
 
-        } catch (const std::exception& e) {
-            std::cerr << "Error saving library file: " << e.what() << std::endl;
+        }
+        catch (const std::exception& e)
+		{
+            std::cerr << "Error saving library file: " << e.what() << '\n';
             return false;
         }
     }
 
     bool LibraryFile::load_from_file(const std::filesystem::path& filePath)
     {
-        try {
-            if (!std::filesystem::exists(filePath)) {
-                std::cerr << "Error: File does not exist: " << filePath << std::endl;
+        try
+		{
+            if (!std::filesystem::exists(filePath))
+			{
+                std::cerr << "Error: File does not exist: " << filePath << '\n';
                 return false;
             }
 
             std::ifstream file(filePath);
-            if (!file.is_open()) {
-                std::cerr << "Error: Cannot open file for reading: " << filePath << std::endl;
+            if (!file.is_open())
+			{
+                std::cerr << "Error: Cannot open file for reading: " << filePath << '\n';
                 return false;
             }
 
@@ -176,19 +183,26 @@ namespace edx
 
             from_json(j);
 
-            std::cout << "Successfully loaded library from: " << filePath << std::endl;
+            std::cout << "Successfully loaded library from: " << filePath << '\n';
             return true;
 
-        } catch (const json::parse_error& e) {
-            std::cerr << "JSON parse error: " << e.what() << std::endl;
+        }
+        catch (const json::parse_error& e)
+		{
+            std::cerr << "JSON parse error: " << e.what() << '\n';
             return false;
-        } catch (const std::exception& e) {
-            std::cerr << "Error loading library file: " << e.what() << std::endl;
+        }
+        catch (const std::exception& e)
+		{
+            std::cerr << "Error loading library file: " << e.what() << '\n';
             return false;
         }
     }
 
+    //////////////////////////////////////////////////////
     // Validation
+    //////////////////////////////////////////////////////
+
     bool LibraryFile::validate() const
     {
         return get_validation_errors().empty();
@@ -200,21 +214,22 @@ namespace edx
 
         // Validate library info
         if (library.name.empty())
-            errors.push_back("Library name cannot be empty");
+            errors.emplace_back("Library name cannot be empty");
 
         if (library.version.empty())
-            errors.push_back("Library version cannot be empty");
+            errors.emplace_back("Library version cannot be empty");
 
         if (library.author.empty())
-            errors.push_back("Library author cannot be empty");
+            errors.emplace_back("Library author cannot be empty");
 
         // Validate objects
         std::set<std::string> usedIds;
         std::set<std::string> usedUniqueIds;
 
-        for (const auto& obj : objects) {
+        for (const auto& obj : objects)
+		{
             if (obj.id.empty())
-                errors.push_back("Object ID cannot be empty");
+                errors.emplace_back("Object ID cannot be empty");
             else
 			{
                 if (usedIds.contains(obj.id))
@@ -224,7 +239,7 @@ namespace edx
             }
 
             if (obj.uniqueId.empty())
-                errors.push_back("Object unique ID cannot be empty");
+                errors.emplace_back("Object unique ID cannot be empty");
             else
 			{
                 if (usedUniqueIds.contains(obj.uniqueId))
@@ -243,17 +258,21 @@ namespace edx
         return errors;
     }
 
+    //////////////////////////////////////////////////////
     // Object management
+    //////////////////////////////////////////////////////
+
     void LibraryFile::add_object(const LibraryObject& obj)
     {
         // Check for duplicate IDs
-        const auto it = std::ranges::find_if(objects,[&obj](const LibraryObject& existing) {
-            return existing.id == obj.id || existing.uniqueId == obj.uniqueId;
-        });
+        const auto it = std::ranges::find_if(objects,[&obj](const LibraryObject& existing)
+			{
+                return existing.id == obj.id || existing.uniqueId == obj.uniqueId;
+            });
 
         if (it != objects.end())
 		{
-            std::cerr << "Warning: Object with ID " << obj.id << " already exists. Not adding." << std::endl;
+            std::cerr << "Warning: Object with ID " << obj.id << " already exists. Not adding." << '\n';
             return;
         }
 
@@ -291,7 +310,10 @@ namespace edx
         return it != objects.end() ? &*it : nullptr;
     }
 
+    //////////////////////////////////////////////////////
     // Statistics
+    //////////////////////////////////////////////////////
+
     std::vector<std::string> LibraryFile::get_categories() const
     {
         std::set<std::string> uniqueCategories;
@@ -301,7 +323,7 @@ namespace edx
                 uniqueCategories.insert(obj.category);
         }
 
-        return std::vector(uniqueCategories.begin(), uniqueCategories.end());
+        return {uniqueCategories.begin(), uniqueCategories.end()};
     }
 
     std::vector<std::string> LibraryFile::get_asset_types() const
@@ -312,7 +334,7 @@ namespace edx
             if (!obj.assetType.empty())
                 uniqueTypes.insert(obj.assetType);
         }
-        return std::vector(uniqueTypes.begin(), uniqueTypes.end());
+        return {uniqueTypes.begin(), uniqueTypes.end()};
     }
 
 } // namespace edx

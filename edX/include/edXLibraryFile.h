@@ -1,4 +1,4 @@
-/**
+﻿/**
 * -------------------------------------------------------
 * Scenery Editor X - edX File Format
 * -------------------------------------------------------
@@ -35,7 +35,7 @@ namespace edx
     {
         std::random_device rd;
         std::mt19937 gen(rd());
-        std::uniform_int_distribution<> dis(0, 15);
+        std::uniform_int_distribution dis(0, 15);
 
         std::stringstream ss;
         for (int i = 0; i < 8; ++i) // Generate 8 hexadecimal digits
@@ -116,23 +116,23 @@ namespace edx
         void from_json(const json& j);
 
         // File operations
-        bool save_to_file(const std::filesystem::path& filePath) const;
+        [[nodiscard]] bool save_to_file(const std::filesystem::path &filePath) const;
         bool load_from_file(const std::filesystem::path& filePath);
 
         // Validation
-        bool validate() const;
-        std::vector<std::string> get_validation_errors() const;
+        [[nodiscard]] bool validate() const;
+        [[nodiscard]] std::vector<std::string> get_validation_errors() const;
 
         // Object management
         void add_object(const LibraryObject& obj);
         bool remove_object(const std::string& id);
         LibraryObject* find_object(const std::string& id);
-        const LibraryObject* find_object(const std::string& id) const;
+        [[nodiscard]] const LibraryObject* find_object(const std::string& id) const;
 
         // Statistics
-        size_t get_object_count() const { return objects.size(); }
-        std::vector<std::string> get_categories() const;
-        std::vector<std::string> get_asset_types() const;
+        [[nodiscard]] size_t get_object_count() const { return objects.size(); }
+        [[nodiscard]] std::vector<std::string> get_categories() const;
+        [[nodiscard]] std::vector<std::string> get_asset_types() const;
     };
 
 } // namespace edx

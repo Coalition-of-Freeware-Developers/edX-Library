@@ -1,4 +1,4 @@
-/**
+﻿/**
 * -------------------------------------------------------
 * Scenery Editor X - edX File Format
 * -------------------------------------------------------
@@ -13,8 +13,8 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
-#include <edX/includes/edXProjectFile.h>
-#include <edX/includes/edXTimeUtils.h>
+#include <edX/include/edXProjectFile.h>
+#include <edX/include/edXTimeUtils.h>
 
 /// ----------------------------------------------------------------------------
 
@@ -42,17 +42,15 @@ namespace edx
         author = j.value("author", "");
         description = j.value("description", "");
 
-        if (j.contains("editdate")) {
+        if (j.contains("editdate"))
             editDate = iso_string_to_time_point(j["editdate"]);
-        } else {
+        else
             editDate = std::chrono::system_clock::now();
-        }
 
-        if (j.contains("createdate")) {
+        if (j.contains("createdate"))
             createDate = iso_string_to_time_point(j["createdate"]);
-        } else {
+        else
             createDate = std::chrono::system_clock::now();
-        }
     }
 
     // AirportInfo JSON serialization
@@ -154,9 +152,8 @@ namespace edx
         };
 
         // Add other properties if they exist
-        if (!otherProperties.empty()) {
+        if (!otherProperties.empty())
             j["other-properties"] = otherProperties;
-        }
     }
 
     void SceneAsset::from_json(const json& j)
@@ -174,9 +171,8 @@ namespace edx
         hidden = j.value("hidden", false);
         selected = j.value("selected", false);
 
-        if (j.contains("other-properties")) {
+        if (j.contains("other-properties"))
             otherProperties = j["other-properties"];
-        }
     }
 
     // SceneLayer JSON serialization
@@ -193,9 +189,8 @@ namespace edx
             {"asset-ids", assetIds}
         };
 
-        if (!layerProperties.empty()) {
+        if (!layerProperties.empty())
             j["layer-properties"] = layerProperties;
-        }
     }
 
     void SceneLayer::from_json(const json& j)
@@ -208,13 +203,11 @@ namespace edx
         opacity = j.value("opacity", 1.0);
         zOrder = j.value("z-order", 0);
 
-        if (j.contains("asset-ids")) {
+        if (j.contains("asset-ids"))
             assetIds = j["asset-ids"];
-        }
 
-        if (j.contains("layer-properties")) {
+        if (j.contains("layer-properties"))
             layerProperties = j["layer-properties"];
-        }
     }
 
     // EdxProject JSON serialization
@@ -225,21 +218,24 @@ namespace edx
         airport.to_json(airportJson);
 
         json librariesJson = json::array();
-        for (const auto& lib : libraries) {
+        for (const auto& lib : libraries)
+		{
             json libJson;
             lib.to_json(libJson);
             librariesJson.push_back(libJson);
         }
 
         json assetsJson = json::array();
-        for (const auto& asset : assets) {
+        for (const auto& asset : assets)
+		{
             json assetJson;
             asset.to_json(assetJson);
             assetsJson.push_back(assetJson);
         }
 
         json layersJson = json::array();
-        for (const auto& layer : layers) {
+        for (const auto& layer : layers)
+		{
             json layerJson;
             layer.to_json(layerJson);
             layersJson.push_back(layerJson);
@@ -253,24 +249,23 @@ namespace edx
             {"Layers", layersJson}
         };
 
-        if (!settings.empty()) {
+        if (!settings.empty())
             j["Settings"] = settings;
-        }
     }
 
     void EdxProject::from_json(const json& j)
     {
-        if (j.contains("Project")) {
+        if (j.contains("Project"))
             project.from_json(j["Project"]);
-        }
 
-        if (j.contains("Airport")) {
+        if (j.contains("Airport"))
             airport.from_json(j["Airport"]);
-        }
 
         libraries.clear();
-        if (j.contains("Libraries")) {
-            for (const auto& libJson : j["Libraries"]) {
+        if (j.contains("Libraries"))
+		{
+            for (const auto& libJson : j["Libraries"])
+			{
                 LibraryReference lib;
                 lib.from_json(libJson);
                 libraries.push_back(lib);
@@ -278,8 +273,10 @@ namespace edx
         }
 
         assets.clear();
-        if (j.contains("Assets")) {
-            for (const auto& assetJson : j["Assets"]) {
+        if (j.contains("Assets"))
+		{
+            for (const auto& assetJson : j["Assets"])
+			{
                 SceneAsset asset;
                 asset.from_json(assetJson);
                 assets.push_back(asset);
@@ -287,29 +284,32 @@ namespace edx
         }
 
         layers.clear();
-        if (j.contains("Layers")) {
-            for (const auto& layerJson : j["Layers"]) {
+        if (j.contains("Layers"))
+		{
+            for (const auto& layerJson : j["Layers"])
+			{
                 SceneLayer layer;
                 layer.from_json(layerJson);
                 layers.push_back(layer);
             }
         }
 
-        if (j.contains("Settings")) {
+        if (j.contains("Settings"))
             settings = j["Settings"];
-        }
     }
 
     // File operations
     bool EdxProject::save_to_file(const std::filesystem::path& filePath) const
     {
-        try {
+        try
+		{
             json j;
             to_json(j);
 
             std::ofstream file(filePath);
-            if (!file.is_open()) {
-                std::cerr << "Error: Cannot open file for writing: " << filePath << std::endl;
+            if (!file.is_open())
+			{
+                std::cerr << "Error: Cannot open file for writing: " << filePath << '\n';
                 return false;
             }
 
@@ -317,26 +317,31 @@ namespace edx
             file << j.dump(4);
             file.close();
 
-            std::cout << "Successfully saved project to: " << filePath << std::endl;
+            std::cout << "Successfully saved project to: " << filePath << '\n';
             return true;
 
-        } catch (const std::exception& e) {
-            std::cerr << "Error saving project file: " << e.what() << std::endl;
+        }
+        catch (const std::exception& e)
+		{
+            std::cerr << "Error saving project file: " << e.what() << '\n';
             return false;
         }
     }
 
     bool EdxProject::load_from_file(const std::filesystem::path& filePath)
     {
-        try {
-            if (!std::filesystem::exists(filePath)) {
-                std::cerr << "Error: File does not exist: " << filePath << std::endl;
+        try
+		{
+            if (!std::filesystem::exists(filePath))
+			{
+                std::cerr << "Error: File does not exist: " << filePath << '\n';
                 return false;
             }
 
             std::ifstream file(filePath);
-            if (!file.is_open()) {
-                std::cerr << "Error: Cannot open file for reading: " << filePath << std::endl;
+            if (!file.is_open())
+			{
+                std::cerr << "Error: Cannot open file for reading: " << filePath << '\n';
                 return false;
             }
 
@@ -346,84 +351,80 @@ namespace edx
 
             from_json(j);
 
-            std::cout << "Successfully loaded project from: " << filePath << std::endl;
+            std::cout << "Successfully loaded project from: " << filePath << '\n';
             return true;
 
-        } catch (const json::parse_error& e) {
-            std::cerr << "JSON parse error: " << e.what() << std::endl;
+        }
+        catch (const json::parse_error& e)
+		{
+            std::cerr << "JSON parse error: " << e.what() << '\n';
             return false;
-        } catch (const std::exception& e) {
-            std::cerr << "Error loading project file: " << e.what() << std::endl;
+        }
+        catch (const std::exception& e)
+		{
+            std::cerr << "Error loading project file: " << e.what() << '\n';
             return false;
         }
     }
 
+    //////////////////////////////////////////////////////
+
     // Validation
-    bool EdxProject::validate() const
-    {
-        return get_validation_errors().empty();
-    }
+    bool EdxProject::validate() const  { return get_validation_errors().empty(); }
+
+    //////////////////////////////////////////////////////
 
     std::vector<std::string> EdxProject::get_validation_errors() const
     {
         std::vector<std::string> errors;
 
         // Validate project info
-        if (project.name.empty()) {
-            errors.push_back("Project name cannot be empty");
-        }
+        if (project.name.empty())
+            errors.emplace_back("Project name cannot be empty");
 
-        if (project.editorVersion.empty()) {
-            errors.push_back("Editor version cannot be empty");
-        }
+        if (project.editorVersion.empty())
+            errors.emplace_back("Editor version cannot be empty");
 
         // Validate airport info
-        if (airport.icao.empty()) {
-            errors.push_back("Airport ICAO code cannot be empty");
-        }
+        if (airport.icao.empty())
+            errors.emplace_back("Airport ICAO code cannot be empty");
 
-        if (airport.icao.length() != 4) {
-            errors.push_back("Airport ICAO code must be 4 characters");
-        }
+        if (airport.icao.length() != 4)
+            errors.emplace_back("Airport ICAO code must be 4 characters");
 
         // Validate geographic coordinates
-        if (airport.datumLat < -90.0 || airport.datumLat > 90.0) {
-            errors.push_back("Airport latitude must be between -90 and 90 degrees");
-        }
+        if (airport.datumLat < -90.0 || airport.datumLat > 90.0)
+            errors.emplace_back("Airport latitude must be between -90 and 90 degrees");
 
-        if (airport.datumLon < -180.0 || airport.datumLon > 180.0) {
-            errors.push_back("Airport longitude must be between -180 and 180 degrees");
-        }
+        if (airport.datumLon < -180.0 || airport.datumLon > 180.0)
+            errors.emplace_back("Airport longitude must be between -180 and 180 degrees");
 
         // Validate library references
-        for (const auto& lib : libraries) {
-            if (lib.name.empty()) {
-                errors.push_back("Library name cannot be empty");
-            }
-            if (lib.shortId.empty()) {
-                errors.push_back("Library short-id cannot be empty");
-            }
+        for (const auto& lib : libraries)
+		{
+            if (lib.name.empty())
+                errors.emplace_back("Library name cannot be empty");
+
+            if (lib.shortId.empty())
+                errors.emplace_back("Library short-id cannot be empty");
         }
 
         // Validate assets
-        for (const auto& asset : assets) {
-            if (asset.id.empty()) {
-                errors.push_back("Asset ID cannot be empty");
-            }
+        for (const auto& asset : assets)
+		{
+            if (asset.id.empty())
+                errors.emplace_back("Asset ID cannot be empty");
 
             // Validate geographic coordinates
-            if (asset.latitude < -90.0 || asset.latitude > 90.0) {
-                errors.push_back("Asset latitude must be between -90 and 90 degrees");
-            }
+            if (asset.latitude < -90.0 || asset.latitude > 90.0)
+                errors.emplace_back("Asset latitude must be between -90 and 90 degrees");
 
-            if (asset.longitude < -180.0 || asset.longitude > 180.0) {
-                errors.push_back("Asset longitude must be between -180 and 180 degrees");
-            }
+            if (asset.longitude < -180.0 || asset.longitude > 180.0)
+                errors.emplace_back("Asset longitude must be between -180 and 180 degrees");
 
             // Validate heading
-            if (asset.heading < 0.0 || asset.heading >= 360.0) {
-                errors.push_back("Asset heading must be between 0 and 360 degrees");
-            }
+            if (asset.heading < 0.0 || asset.heading >= 360.0)
+                errors.emplace_back("Asset heading must be between 0 and 360 degrees");
         }
 
         return errors;

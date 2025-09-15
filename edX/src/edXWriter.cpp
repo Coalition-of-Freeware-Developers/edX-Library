@@ -14,8 +14,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <edX/includes/edXProjectFile.h>
-#include "../X-PlaneSceneryLibrary/XPLibraryPath.h"
+#include <edX/include/edXProjectFile.h>
+#include <xplib/include/XPLibraryPath.h>
 
 /// ----------------------------------------------------------------------------
 

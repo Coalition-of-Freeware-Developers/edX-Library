@@ -16,7 +16,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <edX/config/edXConfig.h>
-#include <edX/includes/edXManager.h>
+#include <edX/include/edXManager.h>
 
 /// -------------------------------------------------------
 

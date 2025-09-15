@@ -1,4 +1,4 @@
-/**
+﻿/**
 * -------------------------------------------------------
 * Scenery Editor X - edX File Format
 * -------------------------------------------------------
@@ -29,7 +29,7 @@ struct Asset
 };
 
 // Assuming 'key' and 'value' are part of a map or similar structure
-std::map<std::string, std::string> data = {{"key1", "value1"}, {"key2", "value2"}};
+static std::map<std::string, std::string> data = {{"key1", "value1"}, {"key2", "value2"}};
 
 void readEdxFile(const std::string &filename)
 {

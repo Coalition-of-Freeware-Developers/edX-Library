@@ -13,7 +13,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
-#include <edX/includes/edXLibraryFile.h>
+#include <edX/include/edXLibraryFile.h>
 
 /// ----------------------------------------------------------------------------
 

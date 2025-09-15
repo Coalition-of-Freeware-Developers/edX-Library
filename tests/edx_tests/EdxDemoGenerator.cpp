@@ -15,9 +15,9 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
-#include <edX/includes/edXLibraryFile.h>
-#include <edX/includes/edXManager.h>
-#include <edX/includes/edXProjectFile.h>
+#include <edX/include/edXLibraryFile.h>
+#include <edX/include/edXManager.h>
+#include <edX/include/edXProjectFile.h>
 
 /// -------------------------------------------------------
 
@@ -441,7 +441,7 @@ void GenerateDocumentation(const std::filesystem::path& outputDir, const Library
     auto airportLon = project.airport.datumLon;
     auto airportElevation = project.airport.elevation;
     auto magneticVariation = project.airport.magneticVariation;
-    
+
     doc << "- **Coordinates:** " << std::fixed << std::setprecision(6) << airportLat << ", " << airportLon << "\n";
     doc << "- **Elevation:** " << airportElevation << " ft\n";
     doc << "- **Magnetic Variation:** " << std::fixed << std::setprecision(1) << magneticVariation << "°\n\n";

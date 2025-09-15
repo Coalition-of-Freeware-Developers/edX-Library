@@ -25,7 +25,7 @@ ADD_EXECUTABLE(EdxTests
 
 # Include directories
 TARGET_INCLUDE_DIRECTORIES(EdxTests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/includes
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/dependency
 )
 

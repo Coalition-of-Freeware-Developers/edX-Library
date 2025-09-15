@@ -10,8 +10,8 @@
 * Created: 11/7/2025
 * -------------------------------------------------------
 */
-#include <edX/includes/edXManager.h>
-#include <edX/includes/edXTimeUtils.h>
+#include <edX/include/edXManager.h>
+#include <edX/include/edXTimeUtils.h>
 
 /// ----------------------------------------------------------------------------
 
@@ -27,17 +27,12 @@ namespace edx
         {
             lastError = error;
             if (errorCallback)
-            {
                 errorCallback(error);
-            }
         }
     };
 
     // Constructor
-    EdxManager::EdxManager()
-        : m_pImpl(std::make_unique<Impl>())
-    {
-    }
+    EdxManager::EdxManager() : m_pImpl(std::make_unique<Impl>()) { }
 
     // Destructor
     EdxManager::~EdxManager() = default;
@@ -59,16 +54,14 @@ namespace edx
 
         // Initialize airport info if ICAO provided
         if (!icao.empty())
-        {
             project->airport.icao = icao;
-        }
 
         return project;
     }
 
     std::unique_ptr<EdxProject> EdxManager::load_project(
         const std::string& filePath,
-        ProgressCallback progressCallback)
+        const ProgressCallback &progressCallback)
     {
         try
         {
@@ -98,7 +91,7 @@ namespace edx
     bool EdxManager::save_project(
         const EdxProject& project,
         const std::string& filePath,
-        ProgressCallback progressCallback)
+        const ProgressCallback &progressCallback)
     {
         try
         {
@@ -106,14 +99,14 @@ namespace edx
                 progressCallback(0.0f, "Validating project...");
 
             // Validate project before saving
-            auto errors = validate_project(project);
-            if (!errors.empty())
+            if (auto errors = validate_project(project); !errors.empty())
             {
                 std::string errorMsg = "Project validation failed: ";
                 for (const auto& error : errors)
                 {
                     errorMsg += error + "; ";
                 }
+
                 m_pImpl->reportError(errorMsg);
                 return false;
             }
@@ -130,9 +123,7 @@ namespace edx
                 progressCallback(1.0f, result ? "Project saved successfully" : "Failed to save project");
 
             if (!result)
-            {
                 m_pImpl->reportError("Failed to save project to: " + filePath);
-            }
 
             return result;
         }
@@ -162,7 +153,7 @@ namespace edx
 
     std::unique_ptr<LibraryFile> EdxManager::load_library(
         const std::string& filePath,
-        ProgressCallback progressCallback)
+        const ProgressCallback &progressCallback) const
     {
         try
         {
@@ -192,7 +183,7 @@ namespace edx
     bool EdxManager::save_library(
         const LibraryFile& library,
         const std::string& filePath,
-        ProgressCallback progressCallback)
+        const ProgressCallback &progressCallback)
     {
         try
         {
@@ -200,14 +191,14 @@ namespace edx
                 progressCallback(0.0f, "Validating library...");
 
             // Validate library before saving
-            auto errors = validate_library(library);
-            if (!errors.empty())
+            if (auto errors = validate_library(library); !errors.empty())
             {
                 std::string errorMsg = "Library validation failed: ";
                 for (const auto& error : errors)
                 {
                     errorMsg += error + "; ";
                 }
+
                 m_pImpl->reportError(errorMsg);
                 return false;
             }
@@ -224,9 +215,7 @@ namespace edx
                 progressCallback(1.0f, result ? "Library saved successfully" : "Failed to save library");
 
             if (!result)
-            {
                 m_pImpl->reportError("Failed to save library to: " + filePath);
-            }
 
             return result;
         }
@@ -248,10 +237,7 @@ namespace edx
         return library.get_validation_errors();
     }
 
-    std::string EdxManager::get_format_version() const
-    {
-        return VERSION;
-    }
+    std::string EdxManager::get_format_version() const { return VERSION; }
 
     bool EdxManager::is_valid_project_file(const std::string& filePath)
     {
@@ -280,25 +266,16 @@ namespace edx
     }
 
     // Error and progress handling
-    void EdxManager::set_error_callback(ErrorCallback callback)
-    {
-        m_pImpl->errorCallback = callback;
-    }
+    void EdxManager::set_error_callback(const ErrorCallback &callback) const { m_pImpl->errorCallback = callback; }
 
-    std::string EdxManager::get_last_error() const
-    {
-        return m_pImpl->lastError;
-    }
+    std::string EdxManager::get_last_error() const { return m_pImpl->lastError; }
 
-    void EdxManager::clear_error()
-    {
-        m_pImpl->lastError.clear();
-    }
+    void EdxManager::clear_error() const {  m_pImpl->lastError.clear(); }
 
     // Conversion utilities
     bool EdxManager::convert_legacy_project(
         const std::string& oldFormatFile,
-        const std::string& newFormatFile)
+        const std::string& newFormatFile) const
     {
         // TODO: Implement legacy conversion when needed
         m_pImpl->reportError("Legacy conversion not yet implemented");
@@ -307,7 +284,7 @@ namespace edx
 
     std::string EdxManager::export_project_to_json(
         const EdxProject& project,
-        bool prettyPrint)
+        bool prettyPrint) const
     {
         try
         {
@@ -315,13 +292,9 @@ namespace edx
             project.to_json(j);
 
             if (prettyPrint)
-            {
                 return j.dump(4); // 4-space indentation
-            }
-            else
-            {
-                return j.dump();
-            }
+
+            return j.dump();
         }
         catch (const std::exception& e)
         {
@@ -330,8 +303,7 @@ namespace edx
         }
     }
 
-    std::unique_ptr<EdxProject> EdxManager::import_project_from_json(
-        const std::string& jsonString)
+    std::unique_ptr<EdxProject> EdxManager::import_project_from_json(const std::string& jsonString) const
     {
         try
         {
@@ -348,10 +320,7 @@ namespace edx
     }
 
     // Private helper methods
-    void EdxManager::report_error(const std::string& error)
-    {
-        m_pImpl->reportError(error);
-    }
+    void EdxManager::report_error(const std::string& error) const { m_pImpl->reportError(error); }
 
     void EdxManager::report_progress(float progress, const std::string& status)
     {
@@ -373,7 +342,7 @@ namespace edx
 
     std::unique_ptr<LibraryFile> load_library_quick(const std::string& filePath)
     {
-        EdxManager manager;
+        const EdxManager manager;
         return manager.load_library(filePath);
     }
 

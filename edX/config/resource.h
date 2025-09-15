@@ -5,10 +5,10 @@
 #define EDX_MAJOR              			0
 #define EDX_MINOR              			0
 #define EDX_PATCH              			03
-#define EDX_BUILD              			32
+#define EDX_BUILD              			39
 //----------------------------------------------------------------------------
-#define EDX_VERSION_STRING              "0.0.3.32"
-#define EDX_VERSION                     0x0000030020
+#define EDX_VERSION_STRING              "0.0.3.39"
+#define EDX_VERSION                     0x0000030027
 #define EDX_FILE_VERSION                EDX_MAJOR,EDX_MINOR,EDX_PATCH,EDX_BUILD
 //----------------------------------------------------------------------------
 // Resource IDs

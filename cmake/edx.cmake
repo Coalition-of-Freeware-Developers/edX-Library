@@ -11,10 +11,10 @@ SET (PROJECT_CONFIG_FILES
 	${CMAKE_SOURCE_DIR}/edX/config/edXConfig.h
 )
 FILE(GLOB EDX_HEADER_DIR
-	${CMAKE_SOURCE_DIR}/edX/includes
+	${CMAKE_SOURCE_DIR}/edX/include
 )
 FILE(GLOB EDX_HEADER_FILES
-    ${CMAKE_SOURCE_DIR}/edX/includes/*
+    ${CMAKE_SOURCE_DIR}/edX/include/*
 )
 FILE(GLOB EDX_SOURCE_DIR
     ${CMAKE_SOURCE_DIR}/edX/src
@@ -108,7 +108,7 @@ TARGET_COMPILE_DEFINITIONS(edX
 
 TARGET_INCLUDE_DIRECTORIES(edX
 	PUBLIC
-		${CMAKE_SOURCE_DIR}/edX/includes
+		${CMAKE_SOURCE_DIR}/edX/include
 	PRIVATE
 		${CMAKE_SOURCE_DIR}
 		${CMAKE_SOURCE_DIR}/edX/src
@@ -117,6 +117,15 @@ TARGET_INCLUDE_DIRECTORIES(edX
 TARGET_LINK_LIBRARIES(edX PRIVATE
 	nlohmann_json::nlohmann_json
 )
+
+# Link XPSceneryLib only if it exists (optional dependency)
+IF (TARGET XPSceneryLib::XPSceneryLib)
+    TARGET_LINK_LIBRARIES(edX PRIVATE XPSceneryLib::XPSceneryLib)
+ELSEIF(TARGET XPSceneryLib)
+    TARGET_LINK_LIBRARIES(edX PRIVATE XPSceneryLib)
+ELSE()
+    MESSAGE(STATUS "XPSceneryLib not found; building edX without X-Plane Scenery integration")
+ENDIF()
 
 # Ensure consistent UTF-8 source decoding on MSVC (prevents fmt / Unicode warnings)
 IF (MSVC)

@@ -3,6 +3,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.8...4.0)
 # --------------------------------
 # Global Setup
 # --------------------------------
+## Using FetchContent_MakeAvailable; no CMP0169 override required
+
 # Early top-level detection (works before project())
 SET(EDXLIB_TOPLEVEL_EARLY OFF)
 IF(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -23,6 +25,11 @@ SET_PROPERTY(GLOBAL PROPERTY USE_FOLDERS ON)
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 SET(BIN_DIR ${CMAKE_SOURCE_DIR}/bin/${CMAKE_CFG_INTDIR})
+
+# FetchContent is used optionally for pulling XPSceneryLib
+IF(CMAKE_VERSION VERSION_GREATER_EQUAL 3.11)
+	INCLUDE(FetchContent)
+ENDIF()
 
 # --------------------------------
 # BUILD SYSTEM
@@ -103,6 +110,8 @@ INCLUDE(CTest)
 OPTION(EDXLIB_VENDOR_DEPS "Allow edX to vendor/add_subdirectory 3rd-party deps" ${PROJECT_IS_TOP_LEVEL})
 OPTION(EDXLIB_BUILD_TESTS "Build edX tests" ${PROJECT_IS_TOP_LEVEL})
 OPTION(EDXLIB_INSTALL "Generate install/export targets" ${PROJECT_IS_TOP_LEVEL})
+# Optionally fetch XPSceneryLib; default OFF so consumers can provide it externally
+OPTION(EDX_USE_FETCHCONTENT_XPLIB "Fetch XPSceneryLib via CMake FetchContent" ON)
 
 # If parent enabled CTest globally, ensure tests are on here too.
 IF(BUILD_TESTING)
@@ -121,27 +130,35 @@ FIND_PACKAGE(nlohmann_json CONFIG REQUIRED)
 ############################################
 # X-Plane Scenery Library (XPLIB via FetchContent)
 ############################################
-IF(FETCHCONTENT_XPLIB AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.11)
-    FETCHCONTENT_DECLARE(
-        XPSceneryLib
-        GIT_REPOSITORY https://github.com/Coalition-of-Freeware-Developers/X-PlaneSceneryLibrary.git
-        GIT_TAG main
-        GIT_SHALLOW TRUE
-        GIT_PROGRESS TRUE
-        GIT_SUBMODULES ""
-    )
-    FETCHCONTENT_GETPROPERTIES(XPSceneryLib)
-    IF(NOT xpscenerylib_POPULATED)
-        FETCHCONTENT_POPULATE(XPSceneryLib)
-        IF(EXISTS "${xpscenerylib_SOURCE_DIR}/cmake/xplib.cmake")
-            FILE(READ "${xpscenerylib_SOURCE_DIR}/cmake/xplib.cmake" XPSCENERYLIB_XPLIB_CMAKE)
-            STRING(REPLACE "CMAKE_SOURCE_DIR" "CMAKE_CURRENT_SOURCE_DIR" XPSCENERYLIB_XPLIB_CMAKE "${XPSCENERYLIB_XPLIB_CMAKE}")
-            FILE(WRITE "${xpscenerylib_SOURCE_DIR}/cmake/xplib.cmake" "${XPSCENERYLIB_XPLIB_CMAKE}")
-        ENDIF()
-        ADD_SUBDIRECTORY("${xpscenerylib_SOURCE_DIR}" "${xpscenerylib_BINARY_DIR}")
-    ENDIF()
-ENDIF()
+IF(EDX_USE_FETCHCONTENT_XPLIB AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.11)
+	FETCHCONTENT_DECLARE(
+		XPSceneryLib
+		GIT_REPOSITORY https://github.com/Coalition-of-Freeware-Developers/X-PlaneSceneryLibrary.git
+		GIT_TAG main
+		GIT_SHALLOW TRUE
+		GIT_PROGRESS TRUE
+		GIT_SUBMODULES ""
+	)
+	# Prefer the modern helper which fetches and adds the subdirectory
+	FETCHCONTENT_MAKEAVAILABLE(XPSceneryLib)
 
+	# Create compatibility aliases if upstream uses a different target name
+	IF(TARGET X-PlaneSceneryLibrary AND NOT TARGET XPSceneryLib)
+		ADD_LIBRARY(XPSceneryLib ALIAS X-PlaneSceneryLibrary)
+	ENDIF()
+	IF(TARGET XPSceneryLib AND NOT TARGET XPSceneryLib::XPSceneryLib)
+		ADD_LIBRARY(XPSceneryLib::XPSceneryLib ALIAS XPSceneryLib)
+	ENDIF()
+
+	# Ensure consistent UTF-8 on MSVC for the fetched target
+	IF(MSVC)
+		IF(TARGET XPSceneryLib)
+			TARGET_COMPILE_OPTIONS(XPSceneryLib PRIVATE /utf-8)
+		ELSEIF(TARGET X-PlaneSceneryLibrary)
+			TARGET_COMPILE_OPTIONS(X-PlaneSceneryLibrary PRIVATE /utf-8)
+		ENDIF()
+	ENDIF()
+ENDIF()
 
 # --------------------------------
 # Catch2 (for tests only)
@@ -176,12 +193,12 @@ IF(TARGET edX)
 	INCLUDE(GNUInstallDirs)
 	TARGET_INCLUDE_DIRECTORIES(edX
 	  PUBLIC
-	    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/edX/includes;${CMAKE_CURRENT_SOURCE_DIR}>
+	    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/edX/include;${CMAKE_CURRENT_SOURCE_DIR}>
 	    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 	)
 	# Ensure no absolute source paths leak into INTERFACE includes
 	SET_PROPERTY(TARGET edX PROPERTY INTERFACE_INCLUDE_DIRECTORIES
-	  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/edX/includes;${CMAKE_CURRENT_SOURCE_DIR}>;$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+	  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/edX/include;${CMAKE_CURRENT_SOURCE_DIR}>;$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 	# Provide a namespaced alias for consumers
 	IF(NOT TARGET edX::edX)
 		ADD_LIBRARY(edX::edX ALIAS edX)
@@ -262,7 +279,7 @@ IF(EDX_INSTALL)
 	  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 	)
 
-	INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/edX/includes/
+	INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/edX/include/
 	        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/edX)
 
 	# Also install configuration headers used by consumers (e.g., edX/config/edX_config.h)

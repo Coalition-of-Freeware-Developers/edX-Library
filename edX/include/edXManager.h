@@ -17,8 +17,8 @@
 #include <string>
 #include <vector>
 #include <edX/config/edXConfig.h>
-#include <edX/includes/edXLibraryFile.h>
-#include <edX/includes/edXProjectFile.h>
+#include <edX/include/edXLibraryFile.h>
+#include <edX/include/edXProjectFile.h>
 
 /// ----------------------------------------------------------------------------
 
@@ -58,11 +58,7 @@ namespace edx
          * @param icao Airport ICAO code (optional)
          * @return Unique pointer to the created project
          */
-        std::unique_ptr<EdxProject> create_project(
-            const std::string& projectName,
-            const std::string& author,
-            const std::string& icao = ""
-        );
+        std::unique_ptr<EdxProject> create_project(const std::string& projectName, const std::string& author, const std::string& icao = "");
 
         /**
          * @brief Load a project from file
@@ -71,10 +67,7 @@ namespace edx
          * @param progressCallback Optional progress callback
          * @return Unique pointer to the loaded project, nullptr on failure
          */
-        std::unique_ptr<EdxProject> load_project(
-            const std::string& filePath,
-            ProgressCallback progressCallback = nullptr
-        );
+        std::unique_ptr<EdxProject> load_project(const std::string& filePath,  const ProgressCallback &progressCallback = nullptr);
 
         /**
          * @brief Save a project to file
@@ -84,13 +77,11 @@ namespace edx
          * @param progressCallback Optional progress callback
          * @return True if successful, false otherwise
          */
-        bool save_project(
-            const EdxProject& project,
-            const std::string& filePath,
-            ProgressCallback progressCallback = nullptr
-        );
+        bool save_project(const EdxProject& project, const std::string& filePath, const ProgressCallback &progressCallback = nullptr );
 
+        //////////////////////////////////////////////////////
         // Library file operations
+        //////////////////////////////////////////////////////
 
         /**
          * @brief Create a new empty library
@@ -113,10 +104,10 @@ namespace edx
          * @param progressCallback Optional progress callback
          * @return Unique pointer to the loaded library, nullptr on failure
          */
-        std::unique_ptr<LibraryFile> load_library(
+        [[nodiscard]] std::unique_ptr<LibraryFile> load_library(
             const std::string& filePath,
-            ProgressCallback progressCallback = nullptr
-        );
+            const ProgressCallback &progressCallback = nullptr
+        ) const;
 
         /**
          * @brief Save a library to file
@@ -129,10 +120,12 @@ namespace edx
         bool save_library(
             const LibraryFile& library,
             const std::string& filePath,
-            ProgressCallback progressCallback = nullptr
+            const ProgressCallback &progressCallback = nullptr
         );
 
+        //////////////////////////////////////////////////////
         // Utility functions
+        //////////////////////////////////////////////////////
 
         /**
          * @brief Validate a project file
@@ -155,7 +148,7 @@ namespace edx
          *
          * @return Version string
          */
-        std::string get_format_version() const;
+        [[nodiscard]] std::string get_format_version() const;
 
         /**
          * @brief Check if a file is a valid edX project file
@@ -173,28 +166,32 @@ namespace edx
          */
         bool is_valid_library_file(const std::string& filePath);
 
+        //////////////////////////////////////////////////////
         // Error and progress handling
+        //////////////////////////////////////////////////////
 
         /**
          * @brief Set error callback for reporting errors
          *
          * @param callback Error callback function
          */
-        void set_error_callback(ErrorCallback callback);
+        void set_error_callback(const ErrorCallback &callback) const;
 
         /**
          * @brief Get the last error message
          *
          * @return Last error message string
          */
-        std::string get_last_error() const;
+        [[nodiscard]] std::string get_last_error() const;
 
         /**
          * @brief Clear the last error
          */
-        void clear_error();
+        void clear_error() const;
 
+        //////////////////////////////////////////////////////
         // Conversion utilities
+        //////////////////////////////////////////////////////
 
         /**
          * @brief Convert old format project to new format
@@ -203,10 +200,10 @@ namespace edx
          * @param newFormatFile Path where to save new format
          * @return True if successful, false otherwise
          */
-        bool convert_legacy_project(
+        [[nodiscard]] bool convert_legacy_project(
             const std::string& oldFormatFile,
             const std::string& newFormatFile
-        );
+        ) const;
 
         /**
          * @brief Export project to JSON string
@@ -215,10 +212,10 @@ namespace edx
          * @param prettyPrint Whether to format JSON with indentation
          * @return JSON string representation
          */
-        std::string export_project_to_json(
+        [[nodiscard]] std::string export_project_to_json(
             const EdxProject& project,
             bool prettyPrint = true
-        );
+        ) const;
 
         /**
          * @brief Import project from JSON string
@@ -228,7 +225,7 @@ namespace edx
          */
         std::unique_ptr<EdxProject> import_project_from_json(
             const std::string& jsonString
-        );
+        ) const;
 
     private:
         // Internal implementation details
@@ -236,11 +233,13 @@ namespace edx
         std::unique_ptr<Impl> m_pImpl;
 
         // Helper methods
-        void report_error(const std::string& error);
+        void report_error(const std::string& error) const;
         void report_progress(float progress, const std::string& status);
     };
 
+    //////////////////////////////////////////////////////
     // Convenience functions for common operations
+    //////////////////////////////////////////////////////
 
     /**
      * @brief Quick load project function
