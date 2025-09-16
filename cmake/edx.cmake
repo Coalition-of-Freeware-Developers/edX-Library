@@ -95,15 +95,15 @@ SOURCE_GROUP("Resource"
 )
 
 TARGET_COMPILE_DEFINITIONS(edX
-    PRIVATE
+	PRIVATE
 		UNICODE
 		_UNICODE
-		_CRT_SECURE_NO_WARNINGS
+		$<$<PLATFORM_ID:Windows>:_CRT_SECURE_NO_WARNINGS>
 		$<$<CONFIG:Debug>:_CONSOLE>
 		$<$<CONFIG:Debug>:_DEBUG>
 		$<$<CONFIG:Debug>:EDX_DEBUG>
 		$<$<CONFIG:Release>:EDX_RELEASE>
-        EDX_EXPORTS  # Define this when building the DLL
+		EDX_EXPORTS  # Define this when building the DLL
 )
 
 TARGET_INCLUDE_DIRECTORIES(edX

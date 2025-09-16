@@ -15,6 +15,11 @@ ENDIF()
 IF(NOT DEFINED CMAKE_TOOLCHAIN_FILE AND EDXLIB_TOPLEVEL_EARLY)
 	IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/dependency/vcpkg/scripts/buildsystems/vcpkg.cmake")
 		SET(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/dependency/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "" FORCE)
+		# Chainload our project toolchain to keep flags/compiler options consistent across platforms
+		SET(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/edx-toolchain.cmake" CACHE STRING "" FORCE)
+	ELSE()
+		# No vcpkg? Use our toolchain directly
+		SET(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/edx-toolchain.cmake" CACHE STRING "" FORCE)
 	ENDIF()
 ENDIF()
 
@@ -23,6 +28,9 @@ SET(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
 SET(VCPKG_INSTALL_OPTIONS --no-print-usage)
 SET_PROPERTY(GLOBAL PROPERTY USE_FOLDERS ON)
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# Apply our compiler/platform defaults early (also chainloadable via vcpkg)
+INCLUDE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/edx-toolchain.cmake OPTIONAL)
 
 # Friendly OS name for output paths and packages (Darwin -> Mac)
 SET(EDX_OUTPUT_OS_NAME ${CMAKE_SYSTEM_NAME})
@@ -40,18 +48,16 @@ ENDIF()
 # --------------------------------
 # BUILD SYSTEM
 # --------------------------------
+# Core language and export compile commands (also set in toolchain; keep for parent projects)
 SET(CMAKE_CXX_STANDARD 20)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-SET(CMAKE_CXX_FLAGS
-  "${CMAKE_CXX_FLAGS}
-   /EHsc
-   /Zc:preprocessor
-   -DNOMINMAX
-   -D_USE_MATH_DEFINES"
-)
-ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -DCMAKE_GENERATOR_PLATFORM=x64)
-MESSAGE(VCPKG_ROOT = " ${CMAKE_TOOLCHAIN_FILE} ")
+
+# Keep this as a simple info message; toolchain file paths help diagnose vcpkg usage
+MESSAGE(STATUS "Toolchain file: ${CMAKE_TOOLCHAIN_FILE}")
+IF(DEFINED VCPKG_CHAINLOAD_TOOLCHAIN_FILE)
+	MESSAGE(STATUS "Chainloaded toolchain: ${VCPKG_CHAINLOAD_TOOLCHAIN_FILE}")
+ENDIF()
 
 # --------------------------------
 
@@ -315,28 +321,28 @@ IF(TARGET edX)
 	ENDIF()
 ENDIF()
 
-IF(WIN32)
+IF(APPLE)
 	FOREACH(TARGET IN ITEMS edX)
 		TARGET_COMPILE_DEFINITIONS(${TARGET} PUBLIC
-		  $<$<CONFIG:Debug>:EDX_WIN_DEBUG>
-		  $<$<CONFIG:Release>:EDX_WIN_RELEASE>
-		  UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS
+			$<$<CONFIG:Debug>:EDX_MAC_DEBUG>
+			$<$<CONFIG:Release>:EDX_MAC_RELEASE>
+			UNICODE _UNICODE
+		)
+	ENDFOREACH()
+ELSEIF(WIN32)
+	FOREACH(TARGET IN ITEMS edX)
+		TARGET_COMPILE_DEFINITIONS(${TARGET} PUBLIC
+			$<$<CONFIG:Debug>:EDX_WIN_DEBUG>
+			$<$<CONFIG:Release>:EDX_WIN_RELEASE>
+			UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS
 		)
 	ENDFOREACH()
 ELSEIF(UNIX)
 	FOREACH(TARGET IN ITEMS edX)
 		TARGET_COMPILE_DEFINITIONS(${TARGET} PUBLIC
-		  $<$<CONFIG:Debug>:EDX_UNIX_DEBUG>
-		  $<$<CONFIG:Release>:EDX_UNIX_RELEASE>
-		  UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS
-		)
-	ENDFOREACH()
-ELSEIF(APPLE)
-	FOREACH(TARGET IN ITEMS edX)
-		TARGET_COMPILE_DEFINITIONS(${TARGET} PUBLIC
-		  $<$<CONFIG:Debug>:EDX_MAC_DEBUG>
-		  $<$<CONFIG:Release>:EDX_MAC_RELEASE>
-		  UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS
+			$<$<CONFIG:Debug>:EDX_UNIX_DEBUG>
+			$<$<CONFIG:Release>:EDX_UNIX_RELEASE>
+			UNICODE _UNICODE
 		)
 	ENDFOREACH()
 ENDIF()

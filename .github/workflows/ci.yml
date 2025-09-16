@@ -126,7 +126,7 @@ jobs:
           name: edX-macos-${{ matrix.arch }}-${{ matrix.build_type }}-${{ needs.version.outputs.version }}
           path: |
             build-${{ matrix.arch }}-${{ matrix.build_type }}/*.tar.gz
-            build-${{ matrix.build_type }}-${{ matrix.arch }}/*.zip
+            build-${{ matrix.arch }}-${{ matrix.build_type }}/*.zip
 
   windows:
     needs: version
@@ -140,9 +140,9 @@ jobs:
       - name: Set resource.h to CI version
         shell: pwsh
         run: python scripts/set_edx_version.py ${{ needs.version.outputs.version }}
-      - name: Install nlohmann_json with vcpkg
+      - name: Install dependencies with vcpkg (manifest mode)
         shell: pwsh
-        run: vcpkg install nlohmann-json
+        run: vcpkg install
       - name: Configure (${{ matrix.build_type }})
         shell: pwsh
         run: |
@@ -152,7 +152,7 @@ jobs:
             -DEDX_CI_MODE=ON `
             -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
       - name: Build (${{ matrix.build_type }})
-        run: cmake --build build-${{ matrix.build_type }} --config ${{ matrix.build_type }} --target ALL_BUILD -m
+        run: cmake --build build-${{ matrix.build_type }} --config ${{ matrix.build_type }} --target ALL_BUILD --parallel
       - name: Test (${{ matrix.build_type }})
         run: ctest --test-dir build-${{ matrix.build_type }} -C ${{ matrix.build_type }} --output-on-failure
       - name: Package (${{ matrix.build_type }})
