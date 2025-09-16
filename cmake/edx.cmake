@@ -135,39 +135,61 @@ ENDIF()
 # Set output directory
 SET_TARGET_PROPERTIES(edX PROPERTIES
     OUTPUT_NAME "edX"
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/${CMAKE_CFG_INTDIR}/${EDX_OUTPUT_OS_NAME}
+	LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/${CMAKE_CFG_INTDIR}/${EDX_OUTPUT_OS_NAME}
+	ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/${CMAKE_CFG_INTDIR}/${EDX_OUTPUT_OS_NAME}
+	VERSION ${PROJECT_VERSION}
+	SOVERSION ${PROJECT_VERSION_MAJOR}
 )
+
+# On Linux, drop the default 'lib' prefix so the file is named exactly 'edX.so'
+IF(UNIX AND NOT APPLE)
+	SET_TARGET_PROPERTIES(edX PROPERTIES PREFIX "")
+ENDIF()
 
 # --------------------------------
 
-IF (WIN32)
-    FIND_PACKAGE(Python3 COMPONENTS Interpreter REQUIRED)
+IF (WIN32 AND TARGET edX AND NOT EDX_INCREMENT_VERSION_ON_CONFIG AND NOT EDX_CI_MODE)
+	# We want to bump only when the shared library is actually built:
+	# - For VS/Xcode: use PRE_LINK so the new version is embedded in the artifact
+	# - For Makefiles/Ninja: use POST_BUILD (runs only when linking occurs); acceptable since
+	#   resource.h is Windows-specific and doesn't embed on non-Windows builds anyway.
 
-    # Script path
-    SET(EDX_VERSION_SCRIPT ${CMAKE_SOURCE_DIR}/scripts/increment_edX_build.py)
+	FIND_PACKAGE(Python3 COMPONENTS Interpreter QUIET)
 
-    IF (MSVC)
-        # PRE_BUILD supported by Visual Studio
-        ADD_CUSTOM_COMMAND(
-            TARGET edX
-            PRE_BUILD
-            COMMAND ${Python3_EXECUTABLE} ${EDX_VERSION_SCRIPT}
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            COMMENT "Incrementing edX build number (resource.h)"
-            VERBATIM
-        )
-    ELSE()
-        # Fallback for other Windows generators
-        ADD_CUSTOM_TARGET(IncrementedXVersion
-            COMMAND ${Python3_EXECUTABLE} ${EDX_VERSION_SCRIPT}
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            COMMENT "Incrementing edX build number (resource.h)"
-            VERBATIM
-            BYPRODUCTS ${CMAKE_SOURCE_DIR}/edX/config/resource.h
-        )
-        ADD_DEPENDENCIES(edX IncrementedXVersion)
-    ENDIF()
+	# Script path (case-insensitive handling)
+	SET(_EDX_VER_SCRIPT_1 ${CMAKE_SOURCE_DIR}/scripts/increment_edX_build.py)
+	SET(_EDX_VER_SCRIPT_2 ${CMAKE_SOURCE_DIR}/scripts/increment_edx_build.py)
+	IF(EXISTS "${_EDX_VER_SCRIPT_1}")
+		SET(EDX_VERSION_SCRIPT ${_EDX_VER_SCRIPT_1})
+	ELSEIF(EXISTS "${_EDX_VER_SCRIPT_2}")
+		SET(EDX_VERSION_SCRIPT ${_EDX_VER_SCRIPT_2})
+	ENDIF()
+
+	IF(Python3_Interpreter_FOUND AND EDX_VERSION_SCRIPT)
+		if(CMAKE_GENERATOR MATCHES "Visual Studio|Xcode")
+			ADD_CUSTOM_COMMAND(
+				TARGET edX
+				PRE_LINK
+				COMMAND ${Python3_EXECUTABLE} ${EDX_VERSION_SCRIPT}
+				WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+				COMMENT "Incrementing edX build number (resource.h) before linking edX"
+				VERBATIM
+			)
+		else()
+			ADD_CUSTOM_COMMAND(
+				TARGET edX
+				POST_BUILD
+				COMMAND ${Python3_EXECUTABLE} ${EDX_VERSION_SCRIPT}
+				WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+				COMMENT "Incrementing edX build number (resource.h) after building edX"
+				VERBATIM
+			)
+		endif()
+	ELSE()
+		MESSAGE(STATUS "Skipping library-only version increment: Python or script not found.")
+	ENDIF()
+ELSEIF(WIN32 AND EDX_INCREMENT_VERSION_ON_CONFIG AND NOT EDX_CI_MODE)
+	MESSAGE(STATUS "Configure-time version increment is enabled; skipping build-time increment to avoid double bump.")
 ENDIF()
 

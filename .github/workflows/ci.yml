@@ -1,0 +1,162 @@
+name: CI (Linux, macOS universal, Windows)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.setver.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: setver
+        shell: bash
+        run: |
+          # Extract from resource.h
+          RH=edX/config/resource.h
+          if [[ -f "$RH" ]]; then
+            MAJ=$(sed -n 's/^#define[ \t]*EDX_MAJOR[ \t]*\([0-9][0-9]*\).*$/\1/p' "$RH")
+            MIN=$(sed -n 's/^#define[ \t]*EDX_MINOR[ \t]*\([0-9][0-9]*\).*$/\1/p' "$RH")
+            PAT=$(sed -n 's/^#define[ \t]*EDX_PATCH[ \t]*\([0-9][0-9]*\).*$/\1/p' "$RH")
+            BLD=$(sed -n 's/^#define[ \t]*EDX_BUILD[ \t]*\([0-9][0-9]*\).*$/\1/p' "$RH")
+            RH_VER="$MAJ.$MIN.$PAT${BLD:+.$BLD}"
+          fi
+
+          # Latest semver-ish tag (optional)
+          TAG_VER=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [[ -n "$TAG_VER" ]]; then
+            # normalize leading 'v'
+            TAG_VER=${TAG_VER#v}
+          fi
+
+          # Optional environment override (repository/organization env var)
+          ENV_VER="${EDX_CI_VERSION:-}"
+          ENV_VER=${ENV_VER#v}
+
+          # Choose highest by lexicographic semver compare (simplified)
+          pick_ver() { printf '%s\n' "$@" | awk -F. '{ printf("%d.%d.%d.%d\n", $1,$2,$3,$4?$4:0) }' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1; }
+          CANDIDATES=()
+          [[ -n "$RH_VER" ]] && CANDIDATES+=("$RH_VER")
+          [[ -n "$TAG_VER" ]] && CANDIDATES+=("$TAG_VER")
+          [[ -n "$ENV_VER" ]] && CANDIDATES+=("$ENV_VER")
+
+          if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
+            FINAL_VER="1.0.0"
+          else
+            FINAL_VER=$(pick_ver "${CANDIDATES[@]}")
+          fi
+
+          echo "Chosen version: $FINAL_VER"
+          echo "version=$FINAL_VER" >> "$GITHUB_OUTPUT"
+
+  linux:
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [ Debug, Release ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set resource.h to CI version
+        run: python3 scripts/set_edx_version.py ${{ needs.version.outputs.version }}
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ninja-build cmake git python3
+      - name: Configure (${{ matrix.build_type }})
+        run: cmake -S . -B build-${{ matrix.build_type }} -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DEDXLIB_INSTALL=ON -DEDX_CI_MODE=ON -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
+      - name: Build (${{ matrix.build_type }})
+        run: cmake --build build-${{ matrix.build_type }} -j
+      - name: Test (${{ matrix.build_type }})
+        run: ctest --test-dir build-${{ matrix.build_type }} --output-on-failure
+      - name: Package (${{ matrix.build_type }})
+        run: cmake --build build-${{ matrix.build_type }} --target package
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: edX-linux-${{ matrix.build_type }}-${{ needs.version.outputs.version }}
+          path: |
+            build-${{ matrix.build_type }}/*.tar.gz
+            build-${{ matrix.build_type }}/*.zip
+
+  macos:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [ x86_64, arm64 ]
+        build_type: [ Debug, Release ]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set resource.h to CI version
+        run: python3 scripts/set_edx_version.py ${{ needs.version.outputs.version }}
+      - name: Install deps
+        run: |
+          brew update
+          brew install cmake ninja
+      - name: Configure (${{ matrix.build_type }}, ${{ matrix.arch }})
+        run: |
+          cmake -S . -B build-${{ matrix.arch }}-${{ matrix.build_type }} -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DEDXLIB_INSTALL=ON \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DEDX_CI_MODE=ON \
+            -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
+      - name: Build (${{ matrix.build_type }}, ${{ matrix.arch }})
+        run: cmake --build build-${{ matrix.arch }}-${{ matrix.build_type }} -j
+      - name: Test (${{ matrix.build_type }}, ${{ matrix.arch }})
+        run: ctest --test-dir build-${{ matrix.arch }}-${{ matrix.build_type }} --output-on-failure
+      - name: Install (Homebrew-style prefix)
+        run: cmake --install build-${{ matrix.arch }}-${{ matrix.build_type }} --prefix "$PWD/package-${{ matrix.arch }}-${{ matrix.build_type }}"
+      - name: Package (${{ matrix.build_type }}, ${{ matrix.arch }})
+        run: cmake --build build-${{ matrix.arch }}-${{ matrix.build_type }} --target package
+      - name: Upload artifacts (${{ matrix.build_type }}, ${{ matrix.arch }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: edX-macos-${{ matrix.arch }}-${{ matrix.build_type }}-${{ needs.version.outputs.version }}
+          path: |
+            build-${{ matrix.arch }}-${{ matrix.build_type }}/*.tar.gz
+            build-${{ matrix.build_type }}-${{ matrix.arch }}/*.zip
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [ Debug, Release ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set resource.h to CI version
+        shell: pwsh
+        run: python scripts/set_edx_version.py ${{ needs.version.outputs.version }}
+      - name: Configure (${{ matrix.build_type }})
+        shell: pwsh
+        run: |
+          cmake -S . -B build-${{ matrix.build_type }} -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -DEDXLIB_INSTALL=ON `
+            -DEDX_CI_MODE=ON `
+            -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
+      - name: Build (${{ matrix.build_type }})
+        run: cmake --build build-${{ matrix.build_type }} --config ${{ matrix.build_type }} --target ALL_BUILD -m
+      - name: Test (${{ matrix.build_type }})
+        run: ctest --test-dir build-${{ matrix.build_type }} -C ${{ matrix.build_type }} --output-on-failure
+      - name: Package (${{ matrix.build_type }})
+        run: cmake --build build-${{ matrix.build_type }} --config ${{ matrix.build_type }} --target package
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: edX-windows-${{ matrix.build_type }}-${{ needs.version.outputs.version }}
+          path: |
+            build-${{ matrix.build_type }}/*.zip

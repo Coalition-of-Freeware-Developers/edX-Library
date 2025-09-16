@@ -24,7 +24,13 @@ SET(VCPKG_INSTALL_OPTIONS --no-print-usage)
 SET_PROPERTY(GLOBAL PROPERTY USE_FOLDERS ON)
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-SET(BIN_DIR ${CMAKE_SOURCE_DIR}/bin/${CMAKE_CFG_INTDIR}/${CMAKE_SYSTEM_NAME})
+# Friendly OS name for output paths and packages (Darwin -> Mac)
+SET(EDX_OUTPUT_OS_NAME ${CMAKE_SYSTEM_NAME})
+IF(APPLE OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+	SET(EDX_OUTPUT_OS_NAME "Mac")
+ENDIF()
+
+SET(BIN_DIR ${CMAKE_SOURCE_DIR}/bin/${CMAKE_CFG_INTDIR}/${EDX_OUTPUT_OS_NAME})
 
 # FetchContent is used optionally for pulling XPSceneryLib
 IF(CMAKE_VERSION VERSION_GREATER_EQUAL 3.11)
@@ -79,10 +85,113 @@ IF(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
 ENDIF()
 
 # --------------------------------
+# Version management and sync with resource.h
+# --------------------------------
+# resource.h is the single source of truth for the edX version (see scripts/increment_edx_build.py).
+# Optionally increment the build number during CMake configure, then parse it and feed into project(VERSION ...)
+
+# Option: increment build number during configure (keeps CMake version in sync on same build)
+OPTION(EDX_INCREMENT_VERSION_ON_CONFIG "Increment edX build number during CMake configure (instead of PRE_BUILD)" OFF)
+
+# Discover increment script path robustly (handle edX/edx casing)
+SET(_EDX_VER_SCRIPT_1 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/increment_edX_build.py")
+SET(_EDX_VER_SCRIPT_2 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/increment_edx_build.py")
+IF(EXISTS "${_EDX_VER_SCRIPT_1}")
+	SET(EDX_VERSION_SCRIPT "${_EDX_VER_SCRIPT_1}")
+ELSEIF(EXISTS "${_EDX_VER_SCRIPT_2}")
+	SET(EDX_VERSION_SCRIPT "${_EDX_VER_SCRIPT_2}")
+ENDIF()
+
+IF(EDX_INCREMENT_VERSION_ON_CONFIG AND WIN32)
+	IF(EDX_VERSION_SCRIPT)
+		FIND_PACKAGE(Python3 COMPONENTS Interpreter QUIET)
+		IF(Python3_Interpreter_FOUND)
+			EXECUTE_PROCESS(
+				COMMAND ${Python3_EXECUTABLE} ${EDX_VERSION_SCRIPT}
+				WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+				RESULT_VARIABLE _EDX_INC_RES
+			)
+			IF(_EDX_INC_RES EQUAL 0)
+				MESSAGE(STATUS "Incremented edX build number during configure using ${EDX_VERSION_SCRIPT}")
+			ELSE()
+				MESSAGE(WARNING "Failed to increment edX version during configure (code ${_EDX_INC_RES}). Build-time step may still run.")
+			ENDIF()
+		ELSE()
+			MESSAGE(WARNING "Python3 not found; cannot increment edX build number during configure. Falling back to build-time increment if enabled.")
+		ENDIF()
+	ELSE()
+		MESSAGE(WARNING "increment_edx_build.py not found; skipping configure-time increment.")
+	ENDIF()
+ENDIF()
+
+# If an override version is provided (e.g., by CI), use it; otherwise parse resource.h
+SET(EDX_OVERRIDE_VERSION "" CACHE STRING "Override edX project version (CI use)")
+
+IF(EDX_OVERRIDE_VERSION)
+	SET(EDX_PROJECT_VERSION "${EDX_OVERRIDE_VERSION}")
+	MESSAGE(STATUS "Using overridden edX version: ${EDX_PROJECT_VERSION}")
+ELSE()
+	# Derive project version from edX/config/resource.h
+	# Parse EDX_MAJOR/MINOR/PATCH/BUILD and feed them into project(VERSION ...)
+ENDIF()
+SET(EDX_RESOURCE_H "${CMAKE_CURRENT_SOURCE_DIR}/edX/config/resource.h")
+IF(EXISTS "${EDX_RESOURCE_H}")
+	FILE(READ "${EDX_RESOURCE_H}" _edx_res_content)
+
+	# Helper to extract integer defines from resource.h
+	FUNCTION(_edx_extract_define NAME OUTVAR)
+		STRING(REGEX MATCH "#[ \t]*define[ \t]+${NAME}[ \t]+([0-9]+)" _match "${_edx_res_content}")
+		IF(_match)
+			SET(${OUTVAR} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+		ENDIF()
+	ENDFUNCTION()
+
+	_edx_extract_define(EDX_MAJOR EDX_MAJOR_RAW)
+	_edx_extract_define(EDX_MINOR EDX_MINOR_RAW)
+	_edx_extract_define(EDX_PATCH EDX_PATCH_RAW)
+	_edx_extract_define(EDX_BUILD EDX_BUILD_RAW)
+
+	# Normalize any leading zeros and coerce to integers
+	IF(DEFINED EDX_MAJOR_RAW)
+		MATH(EXPR EDX_VERSION_MAJOR "${EDX_MAJOR_RAW}")
+	ENDIF()
+	IF(DEFINED EDX_MINOR_RAW)
+		MATH(EXPR EDX_VERSION_MINOR "${EDX_MINOR_RAW}")
+	ENDIF()
+	IF(DEFINED EDX_PATCH_RAW)
+		MATH(EXPR EDX_VERSION_PATCH "${EDX_PATCH_RAW}")
+	ENDIF()
+	IF(DEFINED EDX_BUILD_RAW)
+		MATH(EXPR EDX_VERSION_TWEAK "${EDX_BUILD_RAW}")
+	ENDIF()
+
+	IF(DEFINED EDX_VERSION_MAJOR AND DEFINED EDX_VERSION_MINOR AND DEFINED EDX_VERSION_PATCH)
+		IF(DEFINED EDX_VERSION_TWEAK)
+			SET(EDX_PROJECT_VERSION "${EDX_VERSION_MAJOR}.${EDX_VERSION_MINOR}.${EDX_VERSION_PATCH}.${EDX_VERSION_TWEAK}")
+		ELSE()
+			SET(EDX_PROJECT_VERSION "${EDX_VERSION_MAJOR}.${EDX_VERSION_MINOR}.${EDX_VERSION_PATCH}")
+		ENDIF()
+	ENDIF()
+ENDIF()
+
+# Fallback if parsing failed
+IF(NOT DEFINED EDX_PROJECT_VERSION)
+	SET(EDX_VERSION_MAJOR 1)
+	SET(EDX_VERSION_MINOR 0)
+	SET(EDX_VERSION_PATCH 0)
+	SET(EDX_PROJECT_VERSION "${EDX_VERSION_MAJOR}.${EDX_VERSION_MINOR}.${EDX_VERSION_PATCH}")
+	MESSAGE(WARNING "Failed to determine version (no override and parse failed); defaulting to ${EDX_PROJECT_VERSION}")
+ELSE()
+	IF(NOT EDX_OVERRIDE_VERSION)
+		MESSAGE(STATUS "edX version detected from resource.h: ${EDX_PROJECT_VERSION}")
+	ENDIF()
+ENDIF()
+
+# --------------------------------
 # edX Project Setup
 # --------------------------------
 PROJECT(edX
-    VERSION 1.0.0
+	VERSION ${EDX_PROJECT_VERSION}
     DESCRIPTION "Custom file format for Scenery Editor X"
     LANGUAGES CXX C
     HOMEPAGE_URL "https://github.com/Coalition-of-Freeware-Developers/edX-Library"
@@ -112,6 +221,7 @@ OPTION(EDXLIB_BUILD_TESTS "Build edX tests" ${PROJECT_IS_TOP_LEVEL})
 OPTION(EDXLIB_INSTALL "Generate install/export targets" ${PROJECT_IS_TOP_LEVEL})
 # Optionally fetch XPSceneryLib; default OFF so consumers can provide it externally
 OPTION(EDX_USE_FETCHCONTENT_XPLIB "Fetch XPSceneryLib via CMake FetchContent" ON)
+OPTION(EDX_CI_MODE "CI mode: disable build-time version increments" OFF)
 
 # If parent enabled CTest globally, ensure tests are on here too.
 IF(BUILD_TESTING)
@@ -244,27 +354,29 @@ ENDIF()
 # Output directories (only when top-level; don’t override parent)
 # --------------------------------
 IF(PROJECT_IS_TOP_LEVEL)
-	FOREACH(TARGET IN ITEMS EdxTests Catch2 Catch2WithMain edX XPSceneryLib)
-		IF(TARGET ${TARGET})
-			SET_TARGET_PROPERTIES(${TARGET} PROPERTIES
-			  ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_SYSTEM_NAME}
-			  LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_SYSTEM_NAME}
-			  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_SYSTEM_NAME}
-			)
-		ENDIF()
+	# Use structure: bin/${OUTPUTCONFIG}/${CMAKE_SYSTEM_NAME}
+	FOREACH(OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
+    	SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_CURRENT_SOURCE_DIR}/bin/${OUTPUTCONFIG}/${EDX_OUTPUT_OS_NAME})
+    	SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_CURRENT_SOURCE_DIR}/bin/${OUTPUTCONFIG}/${EDX_OUTPUT_OS_NAME})
+    	SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_CURRENT_SOURCE_DIR}/bin/${OUTPUTCONFIG}/${EDX_OUTPUT_OS_NAME})
 	ENDFOREACH()
 
-	FOREACH(OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
-		SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_SYSTEM_NAME}/${OUTPUTCONFIG})
-		SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_SYSTEM_NAME}/${OUTPUTCONFIG})
-		SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_SYSTEM_NAME}/${OUTPUTCONFIG})
+	# Also set per-target generic outputs to a config-resolved path for multi-config generators
+	FOREACH(TARGET IN ITEMS EdxTests Catch2 Catch2WithMain edX XPSceneryLib)
+		IF(TARGET ${TARGET})
+						SET_TARGET_PROPERTIES(${TARGET} PROPERTIES
+							ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_CFG_INTDIR}/${EDX_OUTPUT_OS_NAME}
+							LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_CFG_INTDIR}/${EDX_OUTPUT_OS_NAME}
+							RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_CFG_INTDIR}/${EDX_OUTPUT_OS_NAME}
+						)
+		ENDIF()
 	ENDFOREACH()
 ENDIF()
 
 # --------------------------------
 ## Install/export for package consumption
 # --------------------------------
-IF(EDX_INSTALL)
+IF(EDXLIB_INSTALL)
 	INCLUDE(GNUInstallDirs)
 	INCLUDE(CMakePackageConfigHelpers)
 
@@ -310,7 +422,7 @@ IF(EDX_INSTALL)
 	  COMPATIBILITY SameMajorVersion
 	)
 
-  	INSTALL(FILES
+   	INSTALL(FILES
   	    ${CMAKE_CURRENT_BINARY_DIR}/edXConfig.cmake
   	    ${CMAKE_CURRENT_BINARY_DIR}/edXConfigVersion.cmake
   	  DESTINATION ${EDX_INSTALL_CONFIG_DIR}
@@ -328,6 +440,17 @@ IF(NOT TARGET uninstall)
 	  COMMENT "Uninstalling edX..."
 	)
 ENDIF()
+
+# --------------------------------
+## Packaging (CPack)
+# --------------------------------
+SET(CPACK_PACKAGE_NAME "edX")
+SET(CPACK_PACKAGE_VENDOR "Coalition of Freeware Developers")
+SET(CPACK_PACKAGE_CONTACT "https://github.com/Coalition-of-Freeware-Developers/edX-Library")
+SET(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+SET(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${EDX_OUTPUT_OS_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${CPACK_PACKAGE_VERSION}")
+SET(CPACK_GENERATOR "TGZ;ZIP")
+INCLUDE(CPack)
 
 # --------------------------------
 

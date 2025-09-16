@@ -71,79 +71,32 @@ This repo builds a C++20 shared library for the Scenery Editor X file format (�
 | Airport.TransitionLevel | AirportInfo::transitionLevel |
 | Airport.CTAF (etc.) | AirportInfo::{ctaf, atis, tower, ground, approach, departure, clearance} |
 | Libraries[].Library | LibraryReference::name |
-| Libraries[].local-path | LibraryReference::localPath |
-| Libraries[].entry-count | LibraryReference::entryCount |
-| Libraries[].uuid | LibraryReference::uuid |
-| Libraries[].short-id | LibraryReference::shortId |
-| Libraries[].version | LibraryReference::version |
-| Assets[].id | SceneAsset::id |
-| Assets[].unique-id | SceneAsset::uniqueId |
-| Assets[].latitude | SceneAsset::latitude |
-| Assets[].longitude | SceneAsset::longitude |
 | Assets[].altitude | SceneAsset::altitude |
 | Assets[].heading | SceneAsset::heading |
 | Assets[].associated-library | SceneAsset::associatedLibrary |
 | Assets[].layer-id | SceneAsset::layerId |
-| Assets[].group-id | SceneAsset::groupId |
-| Assets[].locked | SceneAsset::locked |
-| Assets[].hidden | SceneAsset::hidden |
-| Assets[].selected | SceneAsset::selected |
-| Assets[].other-properties | SceneAsset::otherProperties |
 | Layers[].layer-id | SceneLayer::layerId |
 | Layers[].name | SceneLayer::name |
-| Layers[].description | SceneLayer::description |
-| Layers[].locked | SceneLayer::locked |
-| Layers[].hidden | SceneLayer::hidden |
-| Layers[].opacity | SceneLayer::opacity |
 | Layers[].z-order | SceneLayer::zOrder |
 | Layers[].asset-ids | SceneLayer::assetIds |
-| Layers[].layer-properties | SceneLayer::layerProperties |
-
-### Tests and tag usage
 - Test targets: `EdxTests` (Catch2 v3) and `EdxDemoGenerator`.
 - Common Catch2 tags seen in this repo: `[project]`, `[manager]`, `[serialization]`, `[validation]`, `[integration]`, `[file-generation]`, `[airport]`, `[assets]`, `[edge-cases]`, `[performance]`.
 - Run by tag (Windows, after building):
   - From build dir via CTest: `ctest -C Debug -R EdxTests --output-on-failure`.
-  - Direct exe: `.in\Debug\EdxTests.exe [project]` or `.in\Debug\EdxTests.exe "[manager]&&[integration]"`.
-- Tests write files under `test_output/` for inspection in some cases (see `EdxProjectFileTest.cpp`).
-
-### Adding features safely
-- New formats or fields: extend data structs + serializers, then add round-trip tests in `tests/edx_tests/*` (use Catch2 `TEST_CASE` with tags).
 - Keep XPSceneryLib optional: guard links with `if(TARGET XPSceneryLib::XPSceneryLib)`; never hard-require it.
 - Do not introduce global singletons; use `EdxManager` for cross-cutting operations and callbacks.
-
-### Examples
-- Create/save project:
-  - `auto p = edx::EdxManager{}.create_project("My Project", "Author", "KSFO"); edx::save_project_quick(*p, "MyProject.edX");`
-- Generate ID: `auto id = edx::generate_unique_id(); // 8-hex`
-- Library round-trip (via EdxManager):
   - `auto m = edx::EdxManager{}; auto lib = m.create_library("My Library", "Author", "1.0.0"); m.save_library(*lib, "MyLibrary.edxlib"); auto loaded = m.load_library("MyLibrary.edxlib");`
 
-If anything above seems off (e.g., JSON field casing or test locations), ask to confirm before large refactors. Keep instructions concise in PRs and reference the exact files you touched.
-
-### Notes and gotchas
 - Windows build number auto-increment script lives at `scripts/increment_edx_build.py` and is invoked during Windows builds; do not edit `edX/config/resource.h` manually. If a build error mentions `increment_edX_build.py`, verify the path/casing in `cmake/edx.cmake` aligns with the actual filename.
 
-### Library file serialization keys and example
 - Top-level: `Library` (metadata), `Objects` (array of `LibraryObject`).
 - `Library` keys: `name`, `path`, `version`, `author`, `git-repository`, `size-mb`, `description`, `last-modified` → members on `Library`.
-- `LibraryObject` keys: `id`, `unique-id`, `asset-type`, `name`, `description`, `category`, `tags`, `object-path`, `texture-path`, `preview-image`, optional `properties` (JSON) → members on `LibraryObject`.
-- Quick map (library):
-  - `Library.name` → `Library::name`, `Library.version` → `Library::version`, `Library.last-modified` → `Library::lastModified`
   - `Objects[].id` → `LibraryObject::id`, `Objects[].unique-id` → `LibraryObject::uniqueId`, `Objects[].asset-type` → `LibraryObject::assetType`
 
-#### Key-to-member quick map (library)
-| External JSON key | Internal member |
-|---|---|
 | Library.name | Library::name |
 | Library.path | Library::path |
-| Library.version | Library::version |
 | Library.author | Library::author |
 | Library.git-repository | Library::gitRepository |
-| Library.size-mb | Library::sizeInMB |
-| Library.description | Library::description |
-| Library.last-modified | Library::lastModified |
-| Objects[].id | LibraryObject::id |
 | Objects[].unique-id | LibraryObject::uniqueId |
 | Objects[].asset-type | LibraryObject::assetType |
 | Objects[].name | LibraryObject::name |
@@ -169,8 +122,16 @@ If anything above seems off (e.g., JSON field casing or test locations), ask to 
       "unique-id": "e4f5a2b1",
       "asset-type": "building",
       "object-path": "objects/terminals/modern_01.obj",
-      "properties": { "floors": 3 }
     }
   ]
 }
 ```
+
+### Release automation (semantic bump)
+- Source branch: `release`.
+- Tag-triggered bump: push a lightweight tag named `patch`, `minor`, or `major` that points to a commit contained in `release`. The workflow will:
+  - Pick the current version as the max of `resource.h`, latest `v*` tag, and optional `EDX_CI_VERSION`.
+  - Bump the requested segment (resets build number to 0), update `edX/config/resource.h`, commit to `release`, and create tag `vX.Y.Z`.
+  - Build, test, and package on Linux, macOS (per-arch), and Windows using `EDX_CI_MODE=ON` and `EDX_OVERRIDE_VERSION`.
+- Manual dispatch: run the "Release build and publish" workflow with input `bump` = `patch` | `minor` | `major`. It bumps from the latest `release` head and performs the same steps.
+- Build number: CI disables build-number auto-increment to keep published artifacts deterministic; local Windows builds still increment at link time as before.

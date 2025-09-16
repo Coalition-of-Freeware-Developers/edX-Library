@@ -7,8 +7,8 @@ The edX file format library provides a modern, JSON-based file format system for
 ## Features
 
 - **JSON-Based Format**: Clean, human-readable format using industry-standard JSON
-- **Cross-Platform**: Works on Windows, macOS, and Linux 
-- **Modern C++**: Uses C++17 features with smart pointers and proper RAII
+- **Cross-Platform**: Works on Windows, macOS, and Linux
+- **Modern C++**: Uses C++20 features with smart pointers and proper RAII
 - **Extensible**: Easy to add new properties and data structures
 - **Validation**: Built-in validation for data integrity
 - **Type Safety**: Strong typing with comprehensive error handling
@@ -98,7 +98,7 @@ Project files contain complete scenery project information:
 }
 ```
 
-### Library Files (.lib)
+### Library Files (.edxlib)
 
 Library files contain reusable asset definitions:
 
@@ -188,7 +188,7 @@ obj.objectPath = "objects/building_01.obj";
 library->add_object(obj);
 
 // Save library
-manager.save_library(*library, "MyLibrary.lib");
+manager.save_library(*library, "MyLibrary.edxlib");
 ```
 
 ### Quick Functions
@@ -206,16 +206,24 @@ if (project) {
 
 ### Requirements
 
-- C++17 compatible compiler
+- C++20 compatible compiler (GCC 11+/Clang 12+/MSVC 19.3+)
 - CMake 3.15 or higher
-- nlohmann::json (included)
+- nlohmann::json (via vcpkg manifest)
 
 ### CMake Integration
 
+Installed package usage:
+
 ```cmake
-# Add to your CMakeLists.txt
-add_subdirectory(source/edX)
-target_link_libraries(your_target PRIVATE edX)
+find_package(edX CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE edX::edX)
+```
+
+Subdirectory usage (vendored):
+
+```cmake
+add_subdirectory(edX)
+target_link_libraries(your_target PRIVATE edX::edX)
 ```
 
 ### Compilation
@@ -226,6 +234,32 @@ cd build
 cmake ..
 cmake --build .
 ```
+
+### Linux quick start
+
+```bash
+chmod +x ./SetupProject.sh
+./SetupProject.sh
+```
+
+Manual Linux steps:
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+```
+
+Artifacts are placed under `bin/<Config>/<OS>/` (e.g., `bin/Debug/Linux/`) when building at the top level. The shared library on Linux is named `edX.so` (no `lib` prefix) and is versioned using the project version with standard symlinks (e.g., `edX.so -> edX.so.1 -> edX.so.1.2.3`).
+
+### Build options and versioning
+
+- Version source of truth: `edX/config/resource.h`. CMake parses this to set the project version and target `VERSION/SOVERSION`.
+- `EDX_CI_MODE` (default OFF): when ON, disables build-time version bumping (used by CI).
+- `EDX_OVERRIDE_VERSION` (string): override the project version at configure time (used by CI to keep all platforms in sync).
+- `EDX_INCREMENT_VERSION_ON_CONFIG` (Windows-only, default OFF): optionally bump the build number once during configure. Do not combine with CI or link-time bumps.
+- `EDXLIB_INSTALL` (default ON when top-level): enables install/export targets and CPack packaging (ZIP/TGZ).
+- Output directories are normalized to `bin/<Config>/<OS>/` where `<OS>` is one of `Windows`, `Mac`, or `Linux`.
 
 ## Architecture
 
@@ -267,9 +301,9 @@ bool success = manager.convert_legacy_project("old_format.txt", "new_format.edX"
 
 The library uses standard C++ and cross-platform file I/O:
 
-- Windows: Full support with Visual Studio 2019+
-- macOS: Clang 10+ with C++17 support  
-- Linux: GCC 7+ or Clang 6+ with C++17 support
+- Windows: Visual Studio 2022 (MSVC 19.3+) with C++20
+- macOS: Clang 12+ with C++20
+- Linux: GCC 11+ or Clang 12+ with C++20
 
 ## Performance Considerations
 
@@ -304,3 +338,11 @@ Licensed under the same terms as Scenery Editor X.
 <div align="center">
 <img src=https://github.com/user-attachments/assets/1d752157-ed53-4f5e-80f9-21c2fdcb2537 width=40%>
 </div>
+
+## Release process
+
+- Releases are orchestrated from the `release` branch.
+- To bump and publish a release automatically:
+  - Tag-based: push a lightweight tag named `patch`, `minor`, or `major` pointing at a commit contained in `release`.
+  - Manual: run the "Release build and publish" workflow and choose `bump` = `patch` | `minor` | `major`.
+- The workflow chooses the current version (max of `resource.h`, latest `v*` tag, optional `EDX_CI_VERSION`), applies the bump (resets build to 0), updates `edX/config/resource.h`, commits/tag `vX.Y.Z`, then builds/tests/packages across Windows, macOS, and Linux.

@@ -1,0 +1,42 @@
+name: CI Linux (legacy/manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: 'This workflow is superseded by ci.yml; run manually only if needed.'
+        required: false
+
+jobs:
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ninja-build cmake git python3
+
+      - name: Bootstrap vcpkg (local)
+        shell: bash
+        run: |
+          if [ -d dependency/vcpkg ]; then
+            pushd dependency/vcpkg >/dev/null
+            if [ ! -f ./vcpkg ]; then
+              ./bootstrap-vcpkg.sh -disableMetrics
+            fi
+            popd >/dev/null
+          fi
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure

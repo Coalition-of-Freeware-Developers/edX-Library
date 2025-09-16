@@ -1,0 +1,218 @@
+name: Release build and publish
+
+on:
+  push:
+    branches: [ release ]
+    tags: [ patch, minor, major ]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: false
+        default: patch
+        type: choice
+        options: [ patch, minor, major ]
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.setver.outputs.version }}
+      bumped: ${{ steps.setver.outputs.bumped }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine version and optionally bump
+        id: setver
+        shell: bash
+        env:
+          DISPATCH_BUMP: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.bump || '' }}
+        run: |
+          RH=edX/config/resource.h
+          if [[ -f "$RH" ]]; then
+            MAJ=$(sed -n 's/^#define[ \t]*EDX_MAJOR[ \t]*\([0-9][0-9]*\).*$/\1/p' "$RH")
+            MIN=$(sed -n 's/^#define[ \t]*EDX_MINOR[ \t]*\([0-9][0-9]*\).*$/\1/p' "$RH")
+            PAT=$(sed -n 's/^#define[ \t]*EDX_PATCH[ \t]*\([0-9][0-9]*\).*$/\1/p' "$RH")
+            BLD=$(sed -n 's/^#define[ \t]*EDX_BUILD[ \t]*\([0-9][0-9]*\).*$/\1/p' "$RH")
+            RH_VER="$MAJ.$MIN.$PAT${BLD:+.$BLD}"
+          fi
+          TAG_VER=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          [[ -n "$TAG_VER" ]] && TAG_VER=${TAG_VER#v}
+          ENV_VER="${EDX_CI_VERSION:-}"
+          ENV_VER=${ENV_VER#v}
+          pick_ver() { printf '%s\n' "$@" | awk -F. '{ printf("%d.%d.%d.%d\n", $1,$2,$3,$4?$4:0) }' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1; }
+          CANDIDATES=()
+          [[ -n "$RH_VER" ]] && CANDIDATES+=("$RH_VER")
+          [[ -n "$TAG_VER" ]] && CANDIDATES+=("$TAG_VER")
+          [[ -n "$ENV_VER" ]] && CANDIDATES+=("$ENV_VER")
+          if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
+            FINAL_VER="1.0.0"
+          else
+            FINAL_VER=$(pick_ver "${CANDIDATES[@]}")
+          fi
+
+          # Determine bump source: tag name or workflow_dispatch input
+          BUMP_TYPE=""
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            case "${GITHUB_REF_NAME:-}" in
+              patch|minor|major) BUMP_TYPE="${GITHUB_REF_NAME}" ;;
+            esac
+          fi
+          if [[ -z "$BUMP_TYPE" && -n "$DISPATCH_BUMP" ]]; then
+            case "$DISPATCH_BUMP" in
+              patch|minor|major) BUMP_TYPE="$DISPATCH_BUMP" ;;
+            esac
+          fi
+
+          bump_version() {
+            local ver="$1"; local kind="$2"
+            IFS=. read -r a b c d <<<"$ver"; d=${d:-0}
+            case "$kind" in
+              major) a=$((a+1)); b=0; c=0; d=0 ;;
+              minor) b=$((b+1)); c=0; d=0 ;;
+              patch) c=$((c+1)); d=0 ;;
+              *) echo "$ver"; return ;;
+            esac
+            echo "$a.$b.$c"
+          }
+
+          if [[ -n "$BUMP_TYPE" ]]; then
+            # Ensure tag points to release branch commit if bump via tag
+            if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+              git fetch --all --prune
+              TAGNAME="${GITHUB_REF_NAME:-}"
+              TAGCOMMIT=$(git rev-list -n1 "refs/tags/$TAGNAME")
+              if ! git branch -r --contains "$TAGCOMMIT" | grep -qE "(^|[ /])origin/release$"; then
+                echo "Tag does not point to a commit contained in 'release' branch. Aborting bump." >&2
+                exit 1
+              fi
+              git checkout release
+              git reset --hard "$TAGCOMMIT"
+            else
+              # workflow_dispatch: operate on latest release branch HEAD
+              git fetch origin release:release
+              git checkout release
+            fi
+
+            NEW_VER=$(bump_version "$FINAL_VER" "$BUMP_TYPE")
+            echo "Bumping version $FINAL_VER -> $NEW_VER ($BUMP_TYPE)"
+            python3 scripts/set_edx_version.py "$NEW_VER"
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git add edX/config/resource.h
+            git commit -m "chore(release): bump version to v$NEW_VER"
+            git tag -f "v$NEW_VER"
+            git push origin release
+            git push -f origin "v$NEW_VER"
+            echo "version=$NEW_VER" >> "$GITHUB_OUTPUT"
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$FINAL_VER" >> "$GITHUB_OUTPUT"
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$FINAL_VER" >> "$GITHUB_OUTPUT"
+
+  build-linux:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/set_edx_version.py ${{ needs.version.outputs.version }}
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ninja-build cmake git python3
+      - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DEDXLIB_INSTALL=ON -DEDX_CI_MODE=ON -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
+      - run: cmake --build build -j
+      - run: ctest --test-dir build --output-on-failure
+      - run: cmake --build build --target package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: |
+            build/*.tar.gz
+            build/*.zip
+
+  build-macos:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [ x86_64, arm64 ]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/set_edx_version.py ${{ needs.version.outputs.version }}
+      - run: |
+          brew update
+          brew install cmake ninja
+      - run: |
+          cmake -S . -B build-${{ matrix.arch }} -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DEDXLIB_INSTALL=ON \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DEDX_CI_MODE=ON \
+            -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
+      - run: cmake --build build-${{ matrix.arch }} -j
+      - run: ctest --test-dir build-${{ matrix.arch }} --output-on-failure
+      - run: cmake --build build-${{ matrix.arch }} --target package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-${{ matrix.arch }}
+          path: |
+            build-${{ matrix.arch }}/*.tar.gz
+            build-${{ matrix.arch }}/*.zip
+
+  build-windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: pwsh
+        run: python scripts/set_edx_version.py ${{ needs.version.outputs.version }}
+      - shell: pwsh
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DEDXLIB_INSTALL=ON `
+            -DEDX_CI_MODE=ON `
+            -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
+      - run: cmake --build build --config Release --target ALL_BUILD -m
+      - run: ctest --test-dir build -C Release --output-on-failure
+      - run: cmake --build build --config Release --target package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: |
+            build/*.zip
+
+  publish:
+    needs: [version, build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Create tag (if missing)
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          if git rev-parse -q --verify refs/tags/v${{ needs.version.outputs.version }} >/dev/null; then
+            echo "Tag v${{ needs.version.outputs.version }} already exists; skipping."
+          else
+            git tag -f v${{ needs.version.outputs.version }}
+            git push -f origin v${{ needs.version.outputs.version }}
+          fi
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          name: edX v${{ needs.version.outputs.version }}
+          body: |
+            Automated release for version v${{ needs.version.outputs.version }}.
+          files: |
+            dist/**
