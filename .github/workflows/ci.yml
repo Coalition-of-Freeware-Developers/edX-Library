@@ -70,7 +70,7 @@ jobs:
       - name: Install deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential ninja-build cmake git python3
+          sudo apt-get install -y build-essential ninja-build cmake git python3 nlohmann-json3-dev
       - name: Configure (${{ matrix.build_type }})
         run: cmake -S . -B build-${{ matrix.build_type }} -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DEDXLIB_INSTALL=ON -DEDX_CI_MODE=ON -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
       - name: Build (${{ matrix.build_type }})
@@ -102,7 +102,7 @@ jobs:
       - name: Install deps
         run: |
           brew update
-          brew install cmake ninja
+          brew install cmake ninja nlohmann-json
       - name: Configure (${{ matrix.build_type }}, ${{ matrix.arch }})
         run: |
           cmake -S . -B build-${{ matrix.arch }}-${{ matrix.build_type }} -G Ninja \
@@ -140,6 +140,9 @@ jobs:
       - name: Set resource.h to CI version
         shell: pwsh
         run: python scripts/set_edx_version.py ${{ needs.version.outputs.version }}
+      - name: Install nlohmann_json with vcpkg
+        shell: pwsh
+        run: vcpkg install nlohmann-json
       - name: Configure (${{ matrix.build_type }})
         shell: pwsh
         run: |

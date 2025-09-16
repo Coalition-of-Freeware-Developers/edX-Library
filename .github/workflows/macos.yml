@@ -17,7 +17,7 @@ jobs:
       - name: Install dependencies
         run: |
           brew update
-          brew install cmake ninja
+          brew install cmake ninja nlohmann-json
 
       - name: Configure (Release)
         run: |

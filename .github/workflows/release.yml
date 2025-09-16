@@ -122,7 +122,7 @@ jobs:
       - run: python3 scripts/set_edx_version.py ${{ needs.version.outputs.version }}
       - run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential ninja-build cmake git python3
+          sudo apt-get install -y build-essential ninja-build cmake git python3 nlohmann-json3-dev
       - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DEDXLIB_INSTALL=ON -DEDX_CI_MODE=ON -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
       - run: cmake --build build -j
       - run: ctest --test-dir build --output-on-failure
@@ -146,7 +146,7 @@ jobs:
       - run: python3 scripts/set_edx_version.py ${{ needs.version.outputs.version }}
       - run: |
           brew update
-          brew install cmake ninja
+          brew install cmake ninja nlohmann-json
       - run: |
           cmake -S . -B build-${{ matrix.arch }} -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
@@ -172,6 +172,9 @@ jobs:
       - uses: actions/checkout@v4
       - shell: pwsh
         run: python scripts/set_edx_version.py ${{ needs.version.outputs.version }}
+      - name: Install nlohmann_json with vcpkg
+        shell: pwsh
+        run: vcpkg install nlohmann-json
       - shell: pwsh
         run: |
           cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
