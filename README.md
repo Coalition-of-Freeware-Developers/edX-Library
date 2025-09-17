@@ -320,6 +320,58 @@ The library uses standard C++ and cross-platform file I/O:
 - Multi-threading support for large operations
 - Plugin system for custom asset types
 
+## Release process
+
+- Releases are orchestrated from the `release` branch.
+- To bump and publish a release automatically:
+  - Tag-based: push a lightweight tag named `patch`, `minor`, or `major` pointing at a commit contained in `release`.
+  - Manual: run the "Release build and publish" workflow and choose `bump` = `patch` | `minor` | `major`.
+- The workflow chooses the current version (max of `resource.h`, latest `v*` tag, optional `EDX_CI_VERSION`), applies the bump (resets build to 0), updates `edX/config/resource.h`, commits/tag `vX.Y.Z`, then builds/tests/packages across Windows, macOS, and Linux.
+
+## CI setup (GitHub Actions)
+
+### Private dependency access (XPSceneryLib)
+
+This repo optionally fetches the private repository `Coalition-of-Freeware-Developers/X-PlaneSceneryLibrary` during configure via CMake FetchContent. The CI workflows (ci.yml and release.yml) are pre-wired to authenticate by checking out this repo with a GitHub secret and then pointing FetchContent at the local checkout (no network needed during CMake configure).
+
+- Create a repository secret named `EDX_LIB_TOKEN` that contains a Personal Access Token (PAT):
+  - Classic PAT: grant the minimal `repo` scope (read access is sufficient), or
+  - Fine-grained PAT: grant “Contents: Read” permission to the private repository `Coalition-of-Freeware-Developers/X-PlaneSceneryLibrary`.
+- Add it under: Repository Settings → Secrets and variables → Actions → “New repository secret”
+  - Name: `EDX_LIB_TOKEN`
+  - Value: your PAT value
+
+How it works:
+
+- The workflows check out `X-PlaneSceneryLibrary` into `xpscenerylib-src/` using `actions/checkout` with `token: ${{ secrets.EDX_LIB_TOKEN }}`.
+- CMake is invoked with `-DFETCHCONTENT_SOURCE_DIR_XPSCENERYLIB="<absolute path>/xpscenerylib-src"` so FetchContent uses the local copy instead of cloning over HTTPS.
+
+Notes:
+
+- If you don’t need XPSceneryLib, you can disable it with `-DEDX_USE_FETCHCONTENT_XPLIB=OFF`.
+- For local development without secrets, you can point CMake at an existing local clone: `-DFETCHCONTENT_SOURCE_DIR_XPSCENERYLIB="C:/path/to/X-PlaneSceneryLibrary"`.
+
+### Manual CI runs
+
+The main workflow (`CI (Linux, macOS universal, Windows)`) supports manual runs via `workflow_dispatch`.
+
+Steps:
+
+1. Ensure the `EDX_LIB_TOKEN` secret is configured as above (required if XPSceneryLib is private and `EDX_USE_FETCHCONTENT_XPLIB=ON`).
+2. In GitHub, open the Actions tab.
+3. Select “CI (Linux, macOS universal, Windows)”.
+4. Click “Run workflow”, choose the branch (e.g., `main`), and confirm.
+
+### Windows dependencies (vcpkg manifest)
+
+Windows builds use vcpkg in manifest mode. Do not pass explicit ports to `vcpkg install` in CI—dependencies are read from `vcpkg.json`.
+
+Troubleshooting:
+
+- If CMake reports `nlohmann_json` not found on Windows, verify vcpkg ran in manifest mode and that the vcpkg toolchain was supplied to CMake:
+  - `-DCMAKE_TOOLCHAIN_FILE="<repo>/dependency/vcpkg/scripts/buildsystems/vcpkg.cmake"`
+  - Optional chainload: `-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="<repo>/cmake/edx-toolchain.cmake"`
+
 ## License
 
 Copyright (c) 2025 Coalition of Freeware Developers
@@ -338,11 +390,3 @@ Licensed under the same terms as Scenery Editor X.
 <div align="center">
 <img src=https://github.com/user-attachments/assets/1d752157-ed53-4f5e-80f9-21c2fdcb2537 width=40%>
 </div>
-
-## Release process
-
-- Releases are orchestrated from the `release` branch.
-- To bump and publish a release automatically:
-  - Tag-based: push a lightweight tag named `patch`, `minor`, or `major` pointing at a commit contained in `release`.
-  - Manual: run the "Release build and publish" workflow and choose `bump` = `patch` | `minor` | `major`.
-- The workflow chooses the current version (max of `resource.h`, latest `v*` tag, optional `EDX_CI_VERSION`), applies the bump (resets build to 0), updates `edX/config/resource.h`, commits/tag `vX.Y.Z`, then builds/tests/packages across Windows, macOS, and Linux.

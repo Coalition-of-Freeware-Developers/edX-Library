@@ -1,5 +1,6 @@
 # Ignore content built with CMake
 build/
+build-ci/
 /.vscode
 /.vs
 bin/
@@ -191,3 +192,6 @@ _pkginfo.txt
 
 *.sln
 build_cfg
+
+# Local GitHub Actions runner secrets
+.act.secrets
