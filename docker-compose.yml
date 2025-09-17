@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  edx-dev:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    image: edx-library/dev:latest
+    container_name: edx-library-dev
+    working_dir: /workspaces/edX-Library
+    volumes:
+      - .:/workspaces/edX-Library
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - EDX_CI_MODE=ON
+    command: sleep infinity
+
+  edx-build:
+    image: edx-library/dev:latest
+    depends_on:
+      - edx-dev
+    working_dir: /workspaces/edX-Library
+    volumes:
+      - .:/workspaces/edX-Library
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - EDX_CI_MODE=ON
+    entrypoint: ["/bin/bash", "-lc"]
+    command: ["bash scripts/ci-build.sh"]

@@ -1,0 +1,27 @@
+{
+  "name": "edX-Library Dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspaces/edX-Library",
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "cmake.generator": "Ninja",
+        "cmake.configureOnOpen": false
+      },
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "twxs.cmake",
+        "ms-vscode.test-adapter-converter"
+      ]
+    }
+  },
+  "remoteUser": "vscode",
+  "postCreateCommand": "git submodule update --init --recursive || true"
+}

@@ -1,0 +1,7 @@
+--container-architecture linux/amd64
+--pull=false
+--secret-file .act.secrets
+# Use our dev image for ubuntu runners
+-P ubuntu-latest=edx-library/dev:latest
+-P ubuntu-22.04=edx-library/dev:latest
+-P ubuntu-20.04=edx-library/dev:latest

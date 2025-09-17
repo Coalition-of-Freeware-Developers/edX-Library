@@ -250,6 +250,10 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
+### Build and test in Docker
+
+If you prefer an isolated container with all prerequisites and local CI emulation, see `docs/CONTAINER.md`.
+
 Artifacts are placed under `bin/<Config>/<OS>/` (e.g., `bin/Debug/Linux/`) when building at the top level. The shared library on Linux is named `edX.so` (no `lib` prefix) and is versioned using the project version with standard symlinks (e.g., `edX.so -> edX.so.1 -> edX.so.1.2.3`).
 
 ### Build options and versioning
