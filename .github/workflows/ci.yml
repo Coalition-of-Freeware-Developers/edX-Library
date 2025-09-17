@@ -85,7 +85,8 @@ jobs:
           -DEDXLIB_INSTALL=ON \
           -DEDX_CI_MODE=ON \
           -DFETCHCONTENT_SOURCE_DIR_XPSCENERYLIB="$PWD/xpscenerylib-src" \
-          -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
+          -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }} \
+          -DEDX_USE_FETCHCONTENT_XPLIB=OFF
       - name: Build (${{ matrix.build_type }})
         run: cmake --build build-${{ matrix.build_type }} -j
       - name: Test (${{ matrix.build_type }})
@@ -132,7 +133,8 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=/usr/local \
             -DEDX_CI_MODE=ON \
             -DFETCHCONTENT_SOURCE_DIR_XPSCENERYLIB="$PWD/xpscenerylib-src" \
-            -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
+            -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }} \
+            -DEDX_USE_FETCHCONTENT_XPLIB=OFF
       - name: Build (${{ matrix.build_type }}, ${{ matrix.arch }})
         run: cmake --build build-${{ matrix.arch }}-${{ matrix.build_type }} -j
       - name: Test (${{ matrix.build_type }}, ${{ matrix.arch }})
@@ -180,7 +182,14 @@ jobs:
         run: git submodule update --init --recursive
       - name: Configure (${{ matrix.build_type }})
         shell: pwsh
-        run: cmake -S . -B build-${{ matrix.build_type }} -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DEDXLIB_INSTALL=ON -DEDX_CI_MODE=ON -DFETCHCONTENT_SOURCE_DIR_XPSCENERYLIB="${env:GITHUB_WORKSPACE}/xpscenerylib-src" -DCMAKE_TOOLCHAIN_FILE="${env:GITHUB_WORKSPACE}/dependency/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="${env:GITHUB_WORKSPACE}/cmake/edx-toolchain.cmake" -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }}
+        run: cmake -S . -B build-${{ matrix.build_type }} -G "Visual Studio 17 2022" `
+              -A x64 -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+              -DEDXLIB_INSTALL=ON -DEDX_CI_MODE=ON `
+              -DFETCHCONTENT_SOURCE_DIR_XPSCENERYLIB="${env:GITHUB_WORKSPACE}/xpscenerylib-src" `
+              -DCMAKE_TOOLCHAIN_FILE="${env:GITHUB_WORKSPACE}/dependency/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+              -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="${env:GITHUB_WORKSPACE}/cmake/edx-toolchain.cmake" `
+              -DEDX_OVERRIDE_VERSION=${{ needs.version.outputs.version }} `
+              -DEDX_USE_FETCHCONTENT_XPLIB=OFF
       - name: Build (${{ matrix.build_type }})
         run: cmake --build build-${{ matrix.build_type }} --config ${{ matrix.build_type }} --target ALL_BUILD --parallel
       - name: Test (${{ matrix.build_type }})
